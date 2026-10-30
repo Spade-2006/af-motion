@@ -1,5 +1,12 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  createMotionFrameScheduler,
+  releaseBackgroundCanvas,
+  releaseBackgroundTarget as releaseTarget,
+  resizeCanvasToElement as setCanvasSize,
+} from "./internal/canvas-lifecycle.js";
 
 export interface ParticleFieldOptions {
   /** Colors used for particles and connection lines. Defaults to violet and cyan. */
@@ -36,19 +43,6 @@ interface CanvasState {
   height: number;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 const DEFAULT_COLORS = ["#7c3aed", "#06b6d4"] as const;
 const DEFAULT_COUNT = 60;
 const DEFAULT_SIZE_PX = 2;
@@ -56,49 +50,6 @@ const DEFAULT_SPEED = 1;
 const MAX_PARTICLE_COUNT = 1000;
 const CONNECTION_DISTANCE_PX = 120;
 const BASE_VELOCITY = 18;
-
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
 
 function validateColors(colors: readonly string[]): void {
   if (!Array.isArray(colors) || colors.length === 0) {
@@ -230,31 +181,13 @@ export function particleField(
     throw new Error("particleField() requires document.createElement, which is not available in this environment");
   }
 
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  let reducedMotion = mediaQuery?.matches === true;
-  if (
-    speed > 0 &&
-    (typeof requestAnimationFrame !== "function" || typeof cancelAnimationFrame !== "function")
-  ) {
-    throw new Error("particleField() requires requestAnimationFrame and cancelAnimationFrame when motion is enabled");
-  }
-
   // Build and validate every canvas before touching any target styles or DOM.
   const states = elements.map((element) => createCanvasState(element, colors, count, size, speed));
   const stateByElement = new Map(states.map((state) => [state.element, state]));
-  const visible = new Set<CanvasState>();
   let destroyed = false;
-  let frameId: number | null = null;
-  let previousTime: number | null = null;
 
   const resize = (state: CanvasState, width: number, height: number): void => {
-    const dpr = typeof devicePixelRatio === "number" ? Math.max(1, Math.min(devicePixelRatio, 2)) : 1;
-    state.width = Math.max(0, width);
-    state.height = Math.max(0, height);
-    state.canvas.width = Math.round(state.width * dpr);
-    state.canvas.height = Math.round(state.height * dpr);
-    state.context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    setCanvasSize(state, width, height);
     draw(state, size, connections);
   };
 
@@ -263,35 +196,45 @@ export function particleField(
     resize(state, rect.width, rect.height);
   }
 
-  let intersectionObserver: IntersectionObserver | undefined;
-  if (typeof IntersectionObserver === "function") {
-    intersectionObserver = new IntersectionObserver((entries) => {
-      if (destroyed) return;
-      for (const entry of entries) {
-        const state = stateByElement.get(entry.target as HTMLElement);
-        if (!state) continue;
-        if (entry.isIntersecting) {
-          visible.add(state);
-          schedule();
-        } else {
-          visible.delete(state);
-        }
+  const scheduler = createMotionFrameScheduler<CanvasState>({
+    speed: 1,
+    animated: speed > 0,
+    errorName: "particleField()",
+    renderStatic: () => states.forEach((state) => draw(state, size, connections)),
+    update: (state, elapsed) => {
+      for (const particle of state.particles) {
+        particle.x = (particle.x + particle.vx * elapsed / Math.max(state.width, 1) + 1) % 1;
+        particle.y = (particle.y + particle.vy * elapsed / Math.max(state.height, 1) + 1) % 1;
       }
-      if (visible.size === 0) stopFrame();
-    });
-  } else {
-    for (const state of states) visible.add(state);
-  }
+      draw(state, size, connections);
+    },
+  });
 
+  let intersectionObserver: IntersectionObserver | undefined;
   let resizeObserver: ResizeObserver | undefined;
-  if (typeof ResizeObserver === "function") {
-    resizeObserver = new ResizeObserver((entries) => {
-      if (destroyed) return;
-      for (const entry of entries) {
-        const state = stateByElement.get(entry.target as HTMLElement);
-        if (state) resize(state, entry.contentRect.width, entry.contentRect.height);
-      }
-    });
+  try {
+    if (typeof IntersectionObserver === "function") {
+      intersectionObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const state = stateByElement.get(entry.target as HTMLElement);
+          if (state) scheduler.setVisible(state, entry.isIntersecting);
+        }
+      });
+    }
+    if (typeof ResizeObserver === "function") {
+      resizeObserver = new ResizeObserver((entries) => {
+        if (destroyed) return;
+        for (const entry of entries) {
+          const state = stateByElement.get(entry.target as HTMLElement);
+          if (state) resize(state, entry.contentRect.width, entry.contentRect.height);
+        }
+      });
+    }
+  } catch (error) {
+    scheduler.destroy();
+    intersectionObserver?.disconnect();
+    resizeObserver?.disconnect();
+    throw error;
   }
 
   const onWindowResize = (): void => {
@@ -304,49 +247,6 @@ export function particleField(
   const hasWindowResize = !resizeObserver && typeof window !== "undefined";
   if (hasWindowResize) window.addEventListener("resize", onWindowResize);
 
-  const renderStatic = (): void => {
-    for (const state of states) draw(state, size, connections);
-  };
-
-  const stopFrame = (): void => {
-    if (frameId === null) return;
-    cancelAnimationFrame(frameId);
-    frameId = null;
-    previousTime = null;
-  };
-
-  const tick = (time: number): void => {
-    frameId = null;
-    if (destroyed || reducedMotion || visible.size === 0) return;
-    const elapsed = previousTime === null ? 0 : Math.min((time - previousTime) / 1000, 0.05);
-    previousTime = time;
-    for (const state of visible) {
-      for (const particle of state.particles) {
-        particle.x = (particle.x + particle.vx * elapsed / Math.max(state.width, 1) + 1) % 1;
-        particle.y = (particle.y + particle.vy * elapsed / Math.max(state.height, 1) + 1) % 1;
-      }
-      draw(state, size, connections);
-    }
-    frameId = requestAnimationFrame(tick);
-  };
-
-  function schedule(): void {
-    if (destroyed || reducedMotion || speed === 0 || visible.size === 0 || frameId !== null) return;
-    frameId = requestAnimationFrame(tick);
-  }
-
-  const onMotionChange = (event: MediaQueryListEvent): void => {
-    if (destroyed) return;
-    reducedMotion = event.matches;
-    if (event.matches) {
-      stopFrame();
-      renderStatic();
-    } else {
-      previousTime = null;
-      schedule();
-    }
-  };
-
   const acquired: HTMLElement[] = [];
   const inserted: CanvasState[] = [];
   try {
@@ -357,33 +257,33 @@ export function particleField(
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
+      if (!intersectionObserver) scheduler.setVisible(state, true);
     }
   } catch (error) {
-    stopFrame();
+    scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
-    for (const state of inserted) state.element.removeChild(state.canvas);
+    for (const state of inserted) {
+      state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+    }
     for (const element of acquired) releaseTarget(element);
     throw error;
   }
-
-  mediaQuery?.addEventListener?.("change", onMotionChange);
-  schedule();
 
   return {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      stopFrame();
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      scheduler.destroy();
       intersectionObserver?.disconnect();
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
         if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+        releaseBackgroundCanvas(state.canvas);
         releaseTarget(state.element);
       }
-      visible.clear();
     },
   };
 }

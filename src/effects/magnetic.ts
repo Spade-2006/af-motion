@@ -11,6 +11,8 @@ export interface MagneticOptions {
   strength?: number;
   /** Maximum translation per axis, in pixels. Defaults to 12. */
   maxTranslate?: number;
+  /** Maximum pointer distance from the element center to apply attraction. Defaults to unlimited. */
+  distance?: number;
   /** Duration of each movement tween in milliseconds. Defaults to 200. */
   duration?: number;
   /** Defaults to `easings.easeOutCubic`. */
@@ -70,9 +72,11 @@ export function magnetic(target: AnimateTarget, options: MagneticOptions = {}): 
     duration = DEFAULT_DURATION_MS,
     easing = easeOutCubic,
   } = options;
+  const distance = options.distance ?? Number.POSITIVE_INFINITY;
 
   assertNonNegativeFinite("strength", strength);
   assertNonNegativeFinite("maxTranslate", maxTranslate);
+  if (options.distance !== undefined) assertNonNegativeFinite("distance", distance);
   assertNonNegativeFinite("duration", duration);
   if (typeof easing !== "function") {
     throw new TypeError("easing must be a function");
@@ -173,11 +177,18 @@ export function magnetic(target: AnimateTarget, options: MagneticOptions = {}): 
         return;
       }
       if (!state.engaged) engage(element, state);
+      const offsetX = pointer.clientX - state.centerX;
+      const offsetY = pointer.clientY - state.centerY;
+      if (Math.hypot(offsetX, offsetY) > distance) {
+        state.engaged = false;
+        moveTo(element, state, 0, 0, true);
+        return;
+      }
       moveTo(
         element,
         state,
-        clamp((pointer.clientX - state.centerX) * strength, maxTranslate),
-        clamp((pointer.clientY - state.centerY) * strength, maxTranslate),
+        clamp(offsetX * strength, maxTranslate),
+        clamp(offsetY * strength, maxTranslate),
         false,
       );
     };
@@ -215,3 +226,8 @@ export function magnetic(target: AnimateTarget, options: MagneticOptions = {}): 
     },
   };
 }
+
+/** Alias for `magnetic()` with the same strength, translation, and distance options. */
+export const magneticElement = magnetic;
+export type MagneticElementOptions = MagneticOptions;
+export type MagneticElementControls = MagneticControls;

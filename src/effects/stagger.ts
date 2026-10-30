@@ -1,8 +1,15 @@
 import { animate, resolveTargets } from "../core/animate.js";
-import type { AnimatableProperties, AnimateTarget } from "../core/animate.js";
+import type { AnimatableProperties, AnimateTarget, DOMAnimationOptions } from "../core/animate.js";
 import type { AnimationControls, EasingFunction } from "../core/animation.js";
 
 export type StaggerFrom = "first" | "last";
+
+export interface StaggerElementAnimation {
+  /** Element-specific property ranges; defaults to `StaggerOptions.properties`. */
+  properties?: AnimatableProperties;
+  /** Per-element overrides; delay is added to the stagger offset. */
+  options?: DOMAnimationOptions;
+}
 
 export interface StaggerOptions {
   /** `[from, to]` pairs passed to `animate()`. Defaults to a fade-and-rise. */
@@ -15,7 +22,15 @@ export interface StaggerOptions {
   stagger?: number;
   /** Which end of the target list starts first. Defaults to "first". */
   from?: StaggerFrom;
+  /** Supplies animation properties and options for each element before it starts. */
+  configure?: (
+    element: HTMLElement,
+    index: number,
+    order: number,
+  ) => StaggerElementAnimation | void;
   easing?: EasingFunction;
+  /** Playback speed multiplier. Defaults to 1. */
+  playbackRate?: number;
   /** Fires once, after every element has finished. Never fires after `cancel()`. */
   onComplete?: () => void;
   /** Forwarded to `animate()`; reduced motion makes all elements jump to their final state. */
@@ -40,7 +55,7 @@ const DEFAULT_STAGGER_MS = 100;
  *   delay throw before anything is animated. `stagger` must be a finite number >= 0 and
  *   `from` must be "first" or "last" (`RangeError` / `TypeError` respectively).
  * - A target matching no elements returns inert controls.
- * - `cancel()` cancels every child animation and is safe to call repeatedly.
+ * - Playback controls apply to every child animation; `cancel()` is safe to call repeatedly.
  */
 export function stagger(target: AnimateTarget, options: StaggerOptions = {}): StaggerControls {
   const {
@@ -49,7 +64,9 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
     delay = 0,
     stagger: interval = DEFAULT_STAGGER_MS,
     from = "first",
+    configure,
     easing,
+    playbackRate,
     onComplete,
     respectReducedMotion,
   } = options;
@@ -60,11 +77,15 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
   if (from !== "first" && from !== "last") {
     throw new TypeError(`from must be "first" or "last", received ${String(from)}`);
   }
+  if (configure !== undefined && typeof configure !== "function") {
+    throw new TypeError("configure must be a function");
+  }
 
   const baseOptions = {
     duration,
     delay,
     ...(easing === undefined ? {} : { easing }),
+    ...(playbackRate === undefined ? {} : { playbackRate }),
     ...(respectReducedMotion === undefined ? {} : { respectReducedMotion }),
   };
 
@@ -88,11 +109,40 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
   try {
     elements.forEach((element, index) => {
       const order = from === "first" ? index : elements.length - 1 - index;
+      const elementAnimation = configure?.(element, index, order);
+      if (
+        elementAnimation !== undefined &&
+        (elementAnimation === null || typeof elementAnimation !== "object" || Array.isArray(elementAnimation))
+      ) {
+        throw new TypeError(`Stagger configuration for element ${index} must be an object`);
+      }
+      const elementOptions = elementAnimation?.options;
+      if (
+        elementOptions !== undefined &&
+        (elementOptions === null || typeof elementOptions !== "object" || Array.isArray(elementOptions))
+      ) {
+        throw new TypeError(`Stagger options for element ${index} must be an object`);
+      }
+      const elementDelay = elementOptions?.delay ?? 0;
+      const scheduledDelay = delay + order * interval + elementDelay;
+      if (typeof elementDelay !== "number" || !Number.isFinite(elementDelay) || elementDelay < 0 ||
+          !Number.isFinite(scheduledDelay)) {
+        throw new RangeError(`Delay for staggered element ${index} must be finite and >= 0`);
+      }
+      const elementProperties = elementAnimation?.properties ?? properties;
+      const elementComplete = elementOptions?.onComplete;
       children.push(
-        animate(element, properties, {
+        animate(element, elementProperties, {
           ...baseOptions,
-          delay: delay + order * interval,
-          onComplete: handleChildComplete,
+          ...elementOptions,
+          delay: scheduledDelay,
+          onComplete: () => {
+            try {
+              elementComplete?.();
+            } finally {
+              handleChildComplete();
+            }
+          },
         }),
       );
     });
@@ -102,6 +152,22 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
   }
 
   return {
+    seek: (progress) => {
+      for (const child of children) child.seek(progress);
+    },
+    pause: () => {
+      for (const child of children) child.pause();
+    },
+    resume: () => {
+      for (const child of children) child.resume();
+    },
+    reverse: () => {
+      for (const child of children) child.reverse();
+    },
+    setPlaybackRate: (rate) => {
+      for (const child of children) child.setPlaybackRate(rate);
+    },
+    getPlaybackRate: () => children[0]?.getPlaybackRate() ?? playbackRate ?? 1,
     cancel: () => {
       for (const child of children) child.cancel();
     },

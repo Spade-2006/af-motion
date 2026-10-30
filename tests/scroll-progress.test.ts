@@ -148,11 +148,13 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("scrollProgress()", () => {
   it("tracks page progress, batches repeated scroll events, and styles the bar", () => {
+    const onUpdate = vi.fn();
     const controls = scrollProgress({
       color: "#8b5cf6",
       height: 4,
       position: "top",
       smoothing: 0.2,
+      onUpdate,
     });
     const bar = bars()[0]!;
     expect(bar.attributes.get("aria-hidden")).toBe("true");
@@ -163,6 +165,9 @@ describe("scrollProgress()", () => {
     expect(bar.style.getPropertyValue("pointer-events")).toBe("none");
     expect(bar.style.getPropertyValue("transition")).toBe("transform 0.2s ease-out");
     expect(bar.style.getPropertyValue("transform")).toBe("scaleX(0)");
+    expect(controls.getProgress()).toBe(0);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenLastCalledWith(0);
     expect(FakeElement.passiveCalls).toContain("scroll");
 
     fakeWindow.scrollY = 300;
@@ -170,13 +175,17 @@ describe("scrollProgress()", () => {
     fakeWindow.scrollY = 450;
     fakeWindow.dispatch("scroll");
     expect(frames.size).toBe(1);
+    expect(controls.getProgress()).toBe(0.75);
     flushFrames();
     expect(bar.style.getPropertyValue("transform")).toBe("scaleX(0.75)");
+    expect(onUpdate).toHaveBeenLastCalledWith(0.75);
 
     fakeWindow.scrollY = 900;
     fakeWindow.dispatch("scroll");
     flushFrames();
     expect(bar.style.getPropertyValue("transform")).toBe("scaleX(1)");
+    expect(controls.getProgress()).toBe(1);
+    expect(onUpdate.mock.calls.map(([progress]) => progress)).toEqual([0, 0.75, 1]);
     controls.destroy();
     expect(body.children).toHaveLength(0);
     expect(fakeWindow.listeners.get("scroll")?.size ?? 0).toBe(0);
@@ -211,21 +220,107 @@ describe("scrollProgress()", () => {
     expect(scroller.listeners.get("scroll")?.size).toBe(1);
     scroller.scrollTop = 400;
     scroller.dispatch("scroll");
+    expect(controls.getProgress()).toBe(0.5);
     flushFrames();
     expect(bar.style.getPropertyValue("transform")).toBe("scaleX(0.5)");
     controls.destroy();
     expect(scroller.listeners.get("scroll")?.size ?? 0).toBe(0);
   });
 
+  it("re-measures a container when its content size changes and disconnects the observer", () => {
+    const observers: Array<{ callback: () => void; observed: unknown[]; disconnect: ReturnType<typeof vi.fn> }> = [];
+    vi.stubGlobal("ResizeObserver", class {
+      observed: unknown[] = [];
+      disconnect = vi.fn();
+      constructor(public callback: () => void) {
+        observers.push(this);
+      }
+      observe(element: unknown): void {
+        this.observed.push(element);
+      }
+    });
+    const scroller = new FakeElement();
+    const child = new FakeElement();
+    scroller.children.push(child);
+    scroller.scrollHeight = 1000;
+    scroller.clientHeight = 200;
+    scroller.scrollTop = 400;
+    const controls = scrollProgress({ target: asHTMLElement(scroller) });
+    expect(controls.getProgress()).toBe(0.5);
+    expect(observers).toHaveLength(1);
+    expect(observers[0]!.observed).toEqual([scroller, child]);
+
+    scroller.scrollHeight = 600;
+    observers[0]!.callback();
+    flushFrames();
+    expect(controls.getProgress()).toBe(1);
+
+    controls.destroy();
+    controls.destroy();
+    expect(observers[0]!.disconnect).toHaveBeenCalled();
+  });
+
+  it("keeps page tracking free of ResizeObservers and independent between instances", () => {
+    const create = vi.fn();
+    vi.stubGlobal("ResizeObserver", class { constructor() { create(); } observe() {} disconnect() {} });
+    const first = scrollProgress();
+    const second = scrollProgress();
+    expect(create).not.toHaveBeenCalled();
+    first.destroy();
+    expect(fakeWindow.listeners.get("scroll")?.size).toBe(1);
+    second.destroy();
+    expect(fakeWindow.listeners.get("scroll")?.size ?? 0).toBe(0);
+  });
+  it("reports zero progress for a container with no scrollable distance", () => {
+    const scroller = new FakeElement();
+    scroller.scrollTop = 50;
+    scroller.scrollHeight = 200;
+    scroller.clientHeight = 300;
+    const onUpdate = vi.fn();
+    const controls = scrollProgress({ target: asHTMLElement(scroller), onUpdate });
+    const bar = bars()[0]!;
+
+    expect(controls.getProgress()).toBe(0);
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate).toHaveBeenCalledWith(0);
+
+    scroller.dispatch("scroll");
+    flushFrames();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(bar.style.getPropertyValue("transform")).toBe("scaleX(0)");
+    controls.destroy();
+  });
+
+  it("does not report duplicate progress and cancels pending updates on destroy", () => {
+    const onUpdate = vi.fn();
+    const controls = scrollProgress({ onUpdate });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+
+    fakeWindow.dispatch("scroll");
+    flushFrames();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+
+    fakeWindow.scrollY = 150;
+    fakeWindow.dispatch("scroll");
+    expect(frames.size).toBe(1);
+    controls.destroy();
+    flushFrames();
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(frames.size).toBe(0);
+  });
+
   it("updates immediately without smoothing for reduced motion", () => {
     reducedMotion = true;
-    const controls = scrollProgress();
+    const onUpdate = vi.fn();
+    const controls = scrollProgress({ onUpdate });
     const bar = bars()[0]!;
     expect(bar.style.getPropertyValue("transition")).toBe("none");
     fakeWindow.scrollY = 300;
     fakeWindow.dispatch("scroll");
     expect(frames.size).toBe(0);
     expect(bar.style.getPropertyValue("transform")).toBe("scaleX(0.5)");
+    expect(controls.getProgress()).toBe(0.5);
+    expect(onUpdate).toHaveBeenLastCalledWith(0.5);
 
     reducedMotion = false;
     for (const listener of motionListeners) listener({ matches: false });

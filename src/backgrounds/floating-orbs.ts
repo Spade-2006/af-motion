@@ -1,5 +1,10 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  releaseBackgroundTarget as releaseTarget,
+} from "./internal/canvas-lifecycle.js";
 
 export interface FloatingOrbsOptions {
   /** CSS colors assigned to the orbs in order. Defaults to a violet/cyan/pink palette. */
@@ -23,19 +28,6 @@ export interface FloatingOrbsControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 const DEFAULT_COLORS = ["#7c3aed", "#06b6d4", "#ec4899"] as const;
 const DEFAULT_COUNT = 5;
 const DEFAULT_MIN_SIZE_PX = 80;
@@ -45,20 +37,7 @@ const DEFAULT_SPEED_SECONDS = 12;
 const DEFAULT_OPACITY = 0.6;
 const MAX_ORB_COUNT = 100;
 
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
 let nextAnimationId = 0;
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
 
 function assertFinite(name: string, value: number, minimum: number, maximum = Number.POSITIVE_INFINITY): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
@@ -79,35 +58,6 @@ function validateColors(colors: readonly string[]): void {
       throw new TypeError(`Invalid CSS color "${color}"`);
     }
   }
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
 }
 
 function createStylesheet(animationName: string): HTMLStyleElement {
@@ -174,9 +124,7 @@ export function floatingOrbs(
 
   const animationName = `af-motion-floating-orbs-${++nextAnimationId}`;
   const stylesheet = createStylesheet(animationName);
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  const reducedMotion = mediaQuery?.matches === true;
+  const reducedMotion = prefersReducedMotion();
   const layers: HTMLDivElement[] = [];
   const acquired: HTMLElement[] = [];
   let destroyed = false;
@@ -227,11 +175,11 @@ export function floatingOrbs(
     throw error;
   }
 
-  const onMotionChange = (event: MediaQueryListEvent): void => {
+  const stopMotionListener = onReducedMotionChange((reducedMotion) => {
     if (destroyed) return;
     for (const layer of layers) {
       for (const orb of Array.from(layer.children) as HTMLSpanElement[]) {
-        if (event.matches) {
+        if (reducedMotion) {
           orb.style.removeProperty("animation");
           orb.style.setProperty("will-change", "auto");
         } else {
@@ -244,14 +192,13 @@ export function floatingOrbs(
         }
       }
     }
-  };
-  mediaQuery?.addEventListener?.("change", onMotionChange);
+  });
 
   return {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      stopMotionListener();
       for (let index = 0; index < layers.length; index++) {
         const layer = layers[index];
         const element = elements[index];

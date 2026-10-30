@@ -12,10 +12,17 @@ export function prefersReducedMotion(): boolean {
 export function onReducedMotionChange(listener: (reduced: boolean) => void): () => void {
   if (typeof matchMedia !== "function") return () => undefined;
   const query = matchMedia(REDUCED_MOTION_QUERY);
-  if (typeof query?.addEventListener !== "function") return () => undefined;
+  if (!query) return () => undefined;
   const handler = (event?: { matches?: boolean }): void => {
     listener(event?.matches ?? prefersReducedMotion());
   };
-  query.addEventListener("change", handler);
-  return () => query.removeEventListener?.("change", handler);
+  if (typeof query.addEventListener === "function") {
+    query.addEventListener("change", handler);
+    return () => query.removeEventListener?.("change", handler);
+  }
+  if (typeof query.addListener === "function") {
+    query.addListener(handler);
+    return () => query.removeListener?.(handler);
+  }
+  return () => undefined;
 }

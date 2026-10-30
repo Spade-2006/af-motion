@@ -17,8 +17,10 @@ export interface TextScrambleControls {
 }
 
 interface TextState {
-  element: HTMLElement;
-  original: string[];
+  nodes: {
+    node: Text;
+    original: string[];
+  }[];
 }
 
 const DEFAULT_DURATION_MS = 1000;
@@ -29,12 +31,31 @@ function randomCharacter(characters: readonly string[]): string {
   return characters[Math.floor(Math.random() * characters.length)] ?? characters[0] ?? "";
 }
 
-function scrambledText(state: TextState, revealed: number, characters: readonly string[]): string {
-  return state.original
-    .map((character, index) =>
-      index < revealed || /^\s+$/u.test(character) ? character : randomCharacter(characters),
-    )
-    .join("");
+function scrambleState(state: TextState, revealed: number, characters: readonly string[]): void {
+  let offset = 0;
+  for (const { node, original } of state.nodes) {
+    node.data = original.map((character, index) =>
+      offset + index < revealed || /^\s+$/u.test(character) ? character : randomCharacter(characters),
+    ).join("");
+    offset += original.length;
+  }
+}
+
+function textNodes(element: HTMLElement): Text[] {
+  const found: Text[] = [];
+  const visit = (parent: Node): void => {
+    for (const child of Array.from(parent.childNodes)) {
+      if (child.nodeType === 3) {
+        found.push(child as Text);
+        continue;
+      }
+      if (child.nodeType !== 1) continue;
+      const tagName = (child as Element).tagName.toLowerCase();
+      if (tagName !== "script" && tagName !== "style") visit(child);
+    }
+  };
+  visit(element);
+  return found;
 }
 
 /**
@@ -62,8 +83,7 @@ export function textScramble(target: AnimateTarget, options: TextScrambleOptions
   if (elements.length === 0) return { destroy: () => undefined };
 
   const states = elements.map((element): TextState => ({
-    element,
-    original: Array.from(element.textContent ?? ""),
+    nodes: textNodes(element).map((node) => ({ node, original: Array.from(node.data) })),
   }));
   const scrambleCharacters = Array.from(characters);
   let destroyed = false;
@@ -72,7 +92,9 @@ export function textScramble(target: AnimateTarget, options: TextScrambleOptions
   let lastUpdateTime: number | null = null;
 
   const restore = (): void => {
-    for (const state of states) state.element.textContent = state.original.join("");
+    for (const state of states) {
+      for (const { node, original } of state.nodes) node.data = original.join("");
+    }
   };
 
   const stop = (): void => {
@@ -91,7 +113,7 @@ export function textScramble(target: AnimateTarget, options: TextScrambleOptions
     throw new Error("textScramble() requires requestAnimationFrame and cancelAnimationFrame");
   }
 
-  for (const state of states) state.element.textContent = scrambledText(state, 0, scrambleCharacters);
+  for (const state of states) scrambleState(state, 0, scrambleCharacters);
 
   const tick = (time: number): void => {
     frameId = null;
@@ -105,8 +127,9 @@ export function textScramble(target: AnimateTarget, options: TextScrambleOptions
     const progress = Math.min(elapsed / duration, 1);
     if (elapsed - (lastUpdateTime ?? time) >= speed || progress === 1) {
       for (const state of states) {
-        const revealed = Math.floor(progress * state.original.length);
-        state.element.textContent = scrambledText(state, revealed, scrambleCharacters);
+        const totalCharacters = state.nodes.reduce((total, { original }) => total + original.length, 0);
+        const revealed = Math.floor(progress * totalCharacters);
+        scrambleState(state, revealed, scrambleCharacters);
       }
       lastUpdateTime = time;
     }

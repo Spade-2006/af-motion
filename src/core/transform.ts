@@ -1,8 +1,10 @@
 interface TransformRecord {
   /** Inline transform to restore exactly once the last layer is removed. */
   original: string;
+  originalPriority: string;
   /** Transform every layer is appended to: the inline one, or the computed one if none is set. */
   base: string;
+  computedBase: string;
   layers: Map<object, string>;
 }
 
@@ -10,12 +12,19 @@ const records = new WeakMap<HTMLElement, TransformRecord>();
 
 function capture(element: HTMLElement): TransformRecord {
   const original = element.style.transform ?? "";
+  const originalPriority = typeof element.style.getPropertyPriority === "function"
+    ? element.style.getPropertyPriority("transform")
+    : "";
   let base = original;
+  let computedBase = "";
   if (base === "" && typeof getComputedStyle === "function") {
     const computed = getComputedStyle(element).transform;
-    if (computed && computed !== "none") base = computed;
+    if (computed && computed !== "none") {
+      base = computed;
+      computedBase = computed;
+    }
   }
-  return { original, base, layers: new Map() };
+  return { original, originalPriority, base, computedBase, layers: new Map() };
 }
 
 function write(element: HTMLElement, record: TransformRecord): void {
@@ -40,6 +49,39 @@ export function setTransformLayer(element: HTMLElement, owner: object, value: st
   write(element, record);
 }
 
+export function getTransformBase(element: HTMLElement): { value: string | null; priority: string } {
+  const record = records.get(element);
+  if (record) {
+    return {
+      value: record.original === "" ? null : record.original,
+      priority: record.originalPriority,
+    };
+  }
+  const value = element.style.getPropertyValue("transform");
+  return {
+    value: value === "" ? null : value,
+    priority: element.style.getPropertyPriority("transform"),
+  };
+}
+
+export function setTransformBase(
+  element: HTMLElement,
+  value: string | null,
+  priority = "",
+): void {
+  const record = records.get(element);
+  if (!record) {
+    if (value === null) element.style.removeProperty("transform");
+    else element.style.setProperty("transform", value, priority);
+    return;
+  }
+
+  record.original = value ?? "";
+  record.originalPriority = priority;
+  record.base = value ?? record.computedBase;
+  write(element, record);
+}
+
 /**
  * Removes an owner's contribution. When the last layer is removed the original inline
  * transform is restored exactly (or the property removed if there was none).
@@ -53,5 +95,5 @@ export function removeTransformLayer(element: HTMLElement, owner: object): void 
   }
   records.delete(element);
   if (record.original === "") element.style.removeProperty("transform");
-  else element.style.setProperty("transform", record.original);
+  else element.style.setProperty("transform", record.original, record.originalPriority);
 }

@@ -2,10 +2,28 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "v
 import { textScramble } from "../src/effects/text-scramble";
 import type { TextScrambleControls, TextScrambleOptions } from "../src/effects/text-scramble";
 
+class FakeText {
+  readonly nodeType = 3;
+  constructor(public data: string) {}
+}
+
 class FakeHTMLElement {
-  textContent: string | null;
+  readonly nodeType = 1;
+  readonly tagName = "DIV";
+  childNodes: (FakeText | FakeHTMLElement)[] = [];
+
   constructor(text: string) {
-    this.textContent = text;
+    if (text !== "") this.childNodes.push(new FakeText(text));
+  }
+
+  get textContent(): string {
+    return this.childNodes.map((child) =>
+      child instanceof FakeText ? child.data : child.textContent,
+    ).join("");
+  }
+
+  set textContent(value: string | null) {
+    this.childNodes = value ? [new FakeText(value)] : [];
   }
 }
 
@@ -97,6 +115,30 @@ describe("textScramble()", () => {
     flushFrame(100);
     expect(first.textContent).toBe("A B");
     expect(second.textContent).toBe("C D");
+    controls.destroy();
+  });
+
+  it("preserves nested markup and original text nodes while scrambling", () => {
+    const leadingText = new FakeText("Hello ");
+    const emphasized = new FakeHTMLElement("world");
+    const emphasizedText = emphasized.childNodes[0]!;
+    const trailingText = new FakeText("!");
+    const element = new FakeHTMLElement("");
+    element.childNodes = [leadingText, emphasized, trailingText];
+    const controls = textScramble(asHTMLElement(element), {
+      duration: 100,
+      characters: "X",
+      speed: 10,
+    });
+
+    expect(element.childNodes).toEqual([leadingText, emphasized, trailingText]);
+    expect(emphasized.childNodes).toEqual([emphasizedText]);
+    expect(element.textContent).toBe("XXXXX XXXXXX");
+    flushFrame(0);
+    flushFrame(100);
+    expect(element.textContent).toBe("Hello world!");
+    expect(element.childNodes).toEqual([leadingText, emphasized, trailingText]);
+    expect(emphasized.childNodes).toEqual([emphasizedText]);
     controls.destroy();
   });
 

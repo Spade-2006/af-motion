@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { stagger } from "../src/effects/stagger";
+import { stagger as createStagger } from "../src/effects/stagger";
 
 class FakeStyle {
   values = new Map<string, string>();
@@ -19,8 +19,17 @@ let frames: Map<number, FrameRequestCallback>;
 let nextId: number;
 let selectorResults: Record<string, unknown[]>;
 let reducedMotion: boolean;
+let currentTime: number;
+const activeStaggers = new Set<ReturnType<typeof createStagger>>();
+
+function stagger(...args: Parameters<typeof createStagger>): ReturnType<typeof createStagger> {
+  const controls = createStagger(...args);
+  activeStaggers.add(controls);
+  return controls;
+}
 
 function flushFrame(time: number): void {
+  currentTime = time;
   const pending = [...frames.values()];
   frames.clear();
   for (const callback of pending) callback(time);
@@ -39,6 +48,8 @@ beforeEach(() => {
   nextId = 1;
   selectorResults = {};
   reducedMotion = false;
+  currentTime = 0;
+  vi.spyOn(performance, "now").mockImplementation(() => currentTime);
 
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     const id = nextId++;
@@ -61,6 +72,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  for (const controls of activeStaggers) controls.cancel();
+  activeStaggers.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -111,6 +125,55 @@ describe("stagger: ordering", () => {
     flushFrame(0);
     flushFrame(50);
     expect(opacity(a)).toBe("0.25");
+  });
+
+  it("supports element-specific properties and options with ordered delay offsets", () => {
+    const [a, b, c] = makeElements(3) as [HTMLElement, HTMLElement, HTMLElement];
+    selectorResults[".card"] = [a, b, c];
+    const configured: number[] = [];
+    const controls = stagger(".card", {
+      properties: { opacity: [0, 1] },
+      duration: 100,
+      delay: 10,
+      stagger: 20,
+      from: "last",
+      configure: (_element, index, order) => {
+        configured.push(index);
+        return index === 1
+          ? {
+            properties: { opacity: [0.2, 0.8] },
+            options: { delay: 5, duration: 50 },
+          }
+          : undefined;
+      },
+    });
+
+    expect(configured).toEqual([0, 1, 2]);
+    expect([opacity(a), opacity(b), opacity(c)]).toEqual(["0", "0.2", "0"]);
+    flushFrame(0);
+    flushFrame(15);
+    expect([opacity(a), opacity(b), opacity(c)]).toEqual(["0", "0.2", "0.05"]);
+    flushFrame(35);
+    expect([opacity(a), opacity(b), opacity(c)]).toEqual(["0", "0.2", "0.25"]);
+    flushFrame(50);
+    expect([opacity(a), opacity(b), opacity(c)]).toEqual(["0", "0.38", "0.4"]);
+    controls.cancel();
+  });
+
+  it("cancels earlier animations when per-element configuration fails", () => {
+    const [a, b] = makeElements(2) as [HTMLElement, HTMLElement];
+    selectorResults[".card"] = [a, b];
+
+    expect(() => stagger(".card", {
+      properties: { opacity: [0, 1] },
+      configure: (_element, index) => {
+        if (index === 1) throw new Error("configuration failed");
+      },
+    })).toThrow("configuration failed");
+
+    expect(opacity(a)).toBe("0");
+    expect(opacity(b)).toBeUndefined();
+    expect(frames.size).toBe(0);
   });
 
   it("does not use timers", () => {
@@ -222,6 +285,40 @@ describe("stagger: cancellation", () => {
     flushFrame(1100);
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(() => done.cancel()).not.toThrow();
+  });
+});
+
+describe("stagger: playback controls", () => {
+  it("applies pause, resume, reverse, and playback rate to each child", () => {
+    const [first, second] = makeElements(2) as [HTMLElement, HTMLElement];
+    selectorResults[".card"] = [first, second];
+    const controls = stagger(".card", {
+      properties: { opacity: [0, 1] },
+      duration: 200,
+      stagger: 0,
+      playbackRate: 2,
+    });
+
+    expect(controls.getPlaybackRate()).toBe(2);
+    flushFrame(0);
+    flushFrame(25);
+    expect([opacity(first), opacity(second)]).toEqual(["0.25", "0.25"]);
+
+    controls.pause();
+    flushFrame(100);
+    expect([opacity(first), opacity(second)]).toEqual(["0.25", "0.25"]);
+    controls.resume();
+    flushFrame(100);
+    flushFrame(125);
+    expect([opacity(first), opacity(second)]).toEqual(["0.5", "0.5"]);
+
+    controls.reverse();
+    flushFrame(150);
+    expect([opacity(first), opacity(second)]).toEqual(["0.25", "0.25"]);
+    controls.setPlaybackRate(1);
+    expect(controls.getPlaybackRate()).toBe(1);
+    controls.cancel();
+    expect(frames.size).toBe(0);
   });
 });
 

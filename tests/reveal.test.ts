@@ -193,13 +193,14 @@ describe("reveal: animation", () => {
     const a = makeElement();
     const b = makeElement();
     selectorResults[".card"] = [a, b];
-    reveal(".card", { properties: { opacity: [0, 1] }, duration: 100 });
+    const controls = reveal(".card", { properties: { opacity: [0, 1] }, duration: 100 });
 
     intersect(a, true);
     flushFrame(0);
     flushFrame(50);
     expect(styleOf(a).get("opacity")).toBe("0.5");
     expect(styleOf(b).get("opacity")).toBe("0");
+    controls.destroy();
   });
 
   it("jumps to the final state with reduced motion, leaving content visible beforehand", () => {
@@ -233,7 +234,7 @@ describe("reveal: once", () => {
 
   it("does not restart on repeated intersecting entries while visible (once: false)", () => {
     const element = makeElement();
-    reveal(element, { once: false, properties: { opacity: [0, 1] }, duration: 100 });
+    const controls = reveal(element, { once: false, properties: { opacity: [0, 1] }, duration: 100 });
     intersect(element, true);
     flushFrame(0);
     flushFrame(50);
@@ -241,6 +242,7 @@ describe("reveal: once", () => {
     flushFrame(75);
     expect(styleOf(element).get("opacity")).toBe("0.75");
     expect(observer().unobserve).not.toHaveBeenCalled();
+    controls.destroy();
   });
 
   it("replays after leave and re-enter, cancelling the running animation first", () => {

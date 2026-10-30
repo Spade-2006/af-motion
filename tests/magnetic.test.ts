@@ -114,11 +114,12 @@ describe("magnetic: movement", () => {
 
   it("tweens smoothly with the given easing and duration", () => {
     const element = makeElement();
-    magnetic(element as unknown as HTMLElement, { ...linearOptions, easing: (t) => t * t });
+    const controls = magnetic(element as unknown as HTMLElement, { ...linearOptions, easing: (t) => t * t });
     move(element, 170, 125);
     flushFrame(0);
     flushFrame(50);
     expect(transformOf(element)).toBe("translate(2.5px, 0px)");
+    controls.destroy();
   });
 
   it("supports negative offsets", () => {
@@ -168,18 +169,35 @@ describe("magnetic: movement", () => {
     settle();
     expect(transformOf(element)).toBe("translate(5px, 0px)");
   });
+
+  it("returns to rest when the pointer exceeds the configured distance", () => {
+    const element = makeElement();
+    magnetic(element as unknown as HTMLElement, { ...linearOptions, distance: 20 });
+    move(element, 170, 125);
+    settle();
+    expect(transformOf(element)).toBe("translate(10px, 0px)");
+
+    move(element, 180, 125);
+    settle(2000);
+    expect(transformOf(element)).toBeUndefined();
+
+    move(element, 160, 125);
+    settle(3000);
+    expect(transformOf(element)).toBe("translate(5px, 0px)");
+  });
 });
 
 describe("magnetic: layout reads", () => {
   it("measures once per hover, not per move or frame", () => {
     const element = makeElement();
-    magnetic(element as unknown as HTMLElement, linearOptions);
+    const controls = magnetic(element as unknown as HTMLElement, linearOptions);
     element.emit("pointerenter", { clientX: 150, clientY: 125 });
     for (let i = 0; i < 10; i++) {
       move(element, 150 + i, 125);
       flushFrame(i * 16);
     }
     expect(element.getBoundingClientRect).toHaveBeenCalledTimes(1);
+    controls.destroy();
   });
 
   it("measures the resting center when re-entering mid-return", () => {

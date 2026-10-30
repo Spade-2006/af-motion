@@ -232,3 +232,8 @@ export function spotlight(target: AnimateTarget, options: SpotlightOptions = {})
     },
   };
 }
+
+/** Alias for `spotlight()` with the same radial-glow options and cleanup behavior. */
+export const pointerGlow = spotlight;
+export type PointerGlowOptions = SpotlightOptions;
+export type PointerGlowControls = SpotlightControls;

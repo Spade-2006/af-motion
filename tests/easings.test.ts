@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { easeOutBack, easings } from "../src/easing/easings";
+import {
+  easeOutBack,
+  easeInQuad,
+  easings,
+  easingRegistry,
+  getEasing,
+  registerEasing,
+  removeEasing,
+} from "../src/easing/easings";
 import type { EasingName } from "../src/easing/easings";
 
 const names = Object.keys(easings) as EasingName[];
@@ -52,6 +60,36 @@ describe("easings registry", () => {
 
   it("registry entries are the exported functions", () => {
     expect(easings.easeOutBack).toBe(easeOutBack);
+  });
+
+  it("retrieves built-ins without allowing them to be overwritten or removed", () => {
+    expect(getEasing("easeInQuad")).toBe(easeInQuad);
+    expect(removeEasing("easeInQuad")).toBe(false);
+    expect(() => registerEasing("easeInQuad", (progress) => progress)).toThrow(TypeError);
+    expect(getEasing("easeInQuad")).toBe(easeInQuad);
+  });
+
+  it("registers, replaces, retrieves, and removes custom easings", () => {
+    const custom = (progress: number) => progress ** 3;
+    const replacement = (progress: number) => progress ** 2;
+
+    easingRegistry.register("customEase", custom);
+    expect(getEasing("customEase")).toBe(custom);
+    easingRegistry.register("customEase", replacement);
+    expect(easingRegistry.get("customEase")).toBe(replacement);
+    expect(easingRegistry.remove("customEase")).toBe(true);
+    expect(getEasing("customEase")).toBeUndefined();
+    expect(removeEasing("customEase")).toBe(false);
+  });
+
+  it("rejects invalid names and easing values", () => {
+    const invalidName = "" as string;
+    expect(() => registerEasing(invalidName, (progress) => progress)).toThrow(TypeError);
+    expect(() => registerEasing(" padded ", (progress) => progress)).toThrow(TypeError);
+    expect(() => registerEasing("broken", null as never)).toThrow(TypeError);
+    expect(() => getEasing("" as string)).toThrow(TypeError);
+    expect(() => removeEasing(" ")).toThrow(TypeError);
+    expect(() => getEasing(null as never)).toThrow(TypeError);
   });
 });
 

@@ -103,3 +103,71 @@ export const easings: Readonly<EasingRegistry> = {
   easeOutExpo,
   easeOutBack,
 };
+
+export type EasingOption = EasingFunction | string;
+
+export interface EasingRegistryApi {
+  /** Registers or replaces a custom easing by name. Built-in names are reserved. */
+  register(name: string, easing: EasingFunction): void;
+  /** Retrieves a built-in or registered easing; returns undefined when the name is unknown. */
+  get(name: string): EasingFunction | undefined;
+  /** Removes a registered custom easing. Built-ins cannot be removed. */
+  remove(name: string): boolean;
+}
+
+const registeredEasings = new Map<string, EasingFunction>();
+const builtinNames = new Set(Object.keys(easings));
+
+function validateName(name: string): void {
+  if (typeof name !== "string" || name.trim() === "" || name !== name.trim()) {
+    throw new TypeError("Easing name must be a non-empty string without surrounding whitespace");
+  }
+}
+
+function validateEasing(easing: EasingFunction): void {
+  if (typeof easing !== "function") {
+    throw new TypeError("Easing must be a function");
+  }
+}
+
+export function registerEasing(name: string, easing: EasingFunction): void {
+  validateName(name);
+  validateEasing(easing);
+  if (builtinNames.has(name)) {
+    throw new TypeError(`Cannot replace built-in easing "${name}"`);
+  }
+  registeredEasings.set(name, easing);
+}
+
+export function getEasing(name: string): EasingFunction | undefined {
+  validateName(name);
+  if (Object.prototype.hasOwnProperty.call(easings, name)) {
+    return easings[name as EasingName];
+  }
+  return registeredEasings.get(name);
+}
+
+export function removeEasing(name: string): boolean {
+  validateName(name);
+  if (builtinNames.has(name)) return false;
+  return registeredEasings.delete(name);
+}
+
+export const easingRegistry: Readonly<EasingRegistryApi> = Object.freeze({
+  register: registerEasing,
+  get: getEasing,
+  remove: removeEasing,
+});
+
+export function resolveEasing(easing: EasingOption | undefined): EasingFunction {
+  if (easing === undefined) return linear;
+  if (typeof easing === "function") return easing;
+  if (typeof easing !== "string") {
+    throw new TypeError("easing must be a function or a registered easing name");
+  }
+  const resolved = getEasing(easing);
+  if (!resolved) {
+    throw new TypeError(`Unknown easing "${easing}"`);
+  }
+  return resolved;
+}

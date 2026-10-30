@@ -1,5 +1,12 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  releaseBackgroundCanvas,
+  releaseBackgroundTarget as releaseTarget,
+  resizeCanvasToElement as setCanvasSize,
+} from "./internal/canvas-lifecycle.js";
 
 export interface NoiseBackgroundOptions {
   /** Noise alpha amplitude between 0 and 1. Defaults to 0.15. */
@@ -17,19 +24,6 @@ export interface NoiseBackgroundControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface CanvasState {
   element: HTMLElement;
   canvas: HTMLCanvasElement;
@@ -42,49 +36,6 @@ const DEFAULT_INTENSITY = 0.15;
 const DEFAULT_SCALE = 1;
 const DEFAULT_SPEED = 0;
 const DEFAULT_OPACITY = 0.25;
-
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
 
 function validateUnitInterval(name: string, value: number): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
@@ -170,9 +121,7 @@ export function noiseBackground(
     throw new Error("noiseBackground() requires document.createElement, which is not available in this environment");
   }
 
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  let reducedMotion = mediaQuery?.matches === true;
+  let reducedMotion = prefersReducedMotion();
   if (
     speed > 0 &&
     (typeof requestAnimationFrame !== "function" || typeof cancelAnimationFrame !== "function")
@@ -184,11 +133,7 @@ export function noiseBackground(
   const states = elements.map(createCanvasState);
   const stateByElement = new Map(states.map((state) => [state.element, state]));
   const resized = (state: CanvasState, width: number, height: number): void => {
-    const dpr = typeof devicePixelRatio === "number" ? Math.max(1, Math.min(devicePixelRatio, 2)) : 1;
-    state.width = Math.max(0, width);
-    state.height = Math.max(0, height);
-    state.canvas.width = Math.round(state.width * dpr);
-    state.canvas.height = Math.round(state.height * dpr);
+    setCanvasSize(state, width, height);
     drawNoise(state, intensity, scale);
   };
 
@@ -199,6 +144,7 @@ export function noiseBackground(
   }
 
   let destroyed = false;
+  let documentVisible = typeof document === "undefined" || !document.hidden;
   let frameId: number | null = null;
   let previousTime: number | null = null;
   const interval = speed > 0 ? 1000 / speed : Number.POSITIVE_INFINITY;
@@ -212,7 +158,7 @@ export function noiseBackground(
 
   const tick = (time: number): void => {
     frameId = null;
-    if (destroyed || reducedMotion || speed === 0) return;
+    if (destroyed || reducedMotion || !documentVisible || speed === 0) return;
     if (previousTime === null || time - previousTime >= interval) {
       for (const state of states) drawNoise(state, intensity, scale);
       previousTime = time;
@@ -221,9 +167,23 @@ export function noiseBackground(
   };
 
   const schedule = (): void => {
-    if (destroyed || reducedMotion || speed === 0 || frameId !== null) return;
+    if (destroyed || reducedMotion || !documentVisible || speed === 0 || frameId !== null) return;
     frameId = requestAnimationFrame(tick);
   };
+
+  const onVisibilityChange = (): void => {
+    documentVisible = !document.hidden;
+    if (documentVisible) {
+      previousTime = null;
+      schedule();
+    } else {
+      stopFrame();
+    }
+  };
+  const hasVisibilityListener =
+    typeof document !== "undefined" &&
+    typeof document.addEventListener === "function" &&
+    typeof document.removeEventListener === "function";
 
   let resizeObserver: ResizeObserver | undefined;
   if (typeof ResizeObserver === "function") {
@@ -244,9 +204,9 @@ export function noiseBackground(
   };
   const hasWindowResize = !resizeObserver && typeof window !== "undefined";
 
-  const onMotionChange = (event: MediaQueryListEvent): void => {
+  const onMotionChange = (preference: boolean): void => {
     if (destroyed) return;
-    reducedMotion = event.matches;
+    reducedMotion = preference;
     if (reducedMotion) {
       stopFrame();
       for (const state of states) drawNoise(state, intensity, scale);
@@ -255,6 +215,7 @@ export function noiseBackground(
       schedule();
     }
   };
+  let stopMotionListener = (): void => undefined;
 
   const acquired: HTMLElement[] = [];
   const inserted: CanvasState[] = [];
@@ -267,15 +228,21 @@ export function noiseBackground(
       resizeObserver?.observe(state.element);
     }
     if (hasWindowResize) window.addEventListener("resize", onWindowResize);
+    if (hasVisibilityListener) document.addEventListener("visibilitychange", onVisibilityChange);
   } catch (error) {
     stopFrame();
     resizeObserver?.disconnect();
-    for (const state of inserted) state.element.removeChild(state.canvas);
+    if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    if (hasVisibilityListener) document.removeEventListener("visibilitychange", onVisibilityChange);
+    for (const state of inserted) {
+      state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+    }
     for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
-  mediaQuery?.addEventListener?.("change", onMotionChange);
+  stopMotionListener = onReducedMotionChange(onMotionChange);
   schedule();
 
   return {
@@ -283,11 +250,13 @@ export function noiseBackground(
       if (destroyed) return;
       destroyed = true;
       stopFrame();
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      stopMotionListener();
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+      if (hasVisibilityListener) document.removeEventListener("visibilitychange", onVisibilityChange);
       for (const state of states) {
         if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+        releaseBackgroundCanvas(state.canvas);
         releaseTarget(state.element);
       }
     },

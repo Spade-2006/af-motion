@@ -41,19 +41,101 @@ import type {
   ShineOptions,
   RippleControls,
   RippleOptions,
+  MagneticControls,
+  MagneticOptions,
+  MagneticElementControls,
+  MagneticElementOptions,
+  HoverMotionControls,
+  HoverMotionOptions,
+  HoverMotionValues,
+  FollowPointerControls,
+  FollowPointerOptions,
+  DragAxis,
+  DragControls,
+  DragOptions,
+  DragPosition,
+  SwipeControls,
+  SwipeDirection,
+  SwipeGesture,
+  SwipeOptions,
   SpotlightControls as EffectSpotlightControls,
   SpotlightOptions as EffectSpotlightOptions,
+  PointerGlowControls,
+  PointerGlowOptions,
   CursorTrailControls,
   CursorTrailOptions,
   CursorTrailTarget,
   ScrollProgressControls,
   ScrollProgressOptions,
   ScrollProgressPosition,
+  ScrollTriggerControls,
+  ScrollTriggerOptions,
+  InViewCallback,
+  InViewControls,
+  InViewOptions,
+  ScrollVelocityControls,
+  ScrollVelocityData,
+  ScrollVelocityDirection,
+  ScrollVelocityOptions,
+  ScrollDirection,
+  ScrollDirectionControls,
+  ScrollDirectionOptions,
+  AnimationSequenceControls,
+  AnimationSequenceOptions,
+  AnimationSequenceStep,
+  AnimationParallelControls,
+  AnimationParallelOptions,
+  AnimationParallelStep,
+  AnimationTimelineControls,
+  AnimationTimelinePosition,
+  AnimationTimelineStep,
   AnimationControls,
   AnimationOptions,
+  SpringConfig,
+  SpringControls,
+  SpringOptions,
+  SpringUpdate,
+  InertiaControls,
+  InertiaOptions,
+  InertiaUpdate,
+  AnimationPreset,
+  AnimationPresetName,
+  AnimationPresetOverrides,
+  AnimationPresetRegistry,
+  AnimationPresetRegistryApi,
+  MotionDNA,
+  MotionDNAOverrides,
+  MotionDNARegistryApi,
+  AdaptiveMotionConditions,
+  AdaptiveMotionOverrides,
+  AdaptiveMotionProfile,
+  AdaptiveReducedMotion,
+  ComposableEffect,
+  MotionChoreographyAction,
+  MotionChoreographyAnimation,
+  MotionChoreographyControls,
+  MotionChoreographyEffect,
+  MotionChoreographyParallel,
+  EffectCompositionControls,
+  EffectCompositionEntry,
+  EffectCompositionInstance,
+  MotionDNACompositionEntry,
+  MotionRecipe,
+  MotionRecipeContext,
+  MotionRecipeControls,
+  MotionRecipeDefinition,
+  MotionStateControls,
+  MotionStateDefinition,
+  MotionStateDefinitions,
+  MotionStateTransitionControls,
+  MotionStateTransitionOptions,
+  PaletteColorOptions,
+  PaletteColorsListener,
   EasingFunction,
+  EasingOption,
   EasingName,
   EasingRegistry,
+  EasingRegistryApi,
 } from "../src/index";
 
 const easingNames = [
@@ -74,12 +156,185 @@ const easingNames = [
 describe("public API", () => {
   it("exports exactly the expected runtime values", () => {
     expect(Object.keys(api).sort()).toEqual(
-      ["animate", "animateProgress", "aurora", "borderBeam", "countUp", "cursorTrail", "easings", "floatingOrbs", "glow", "gradientBackground", "gradientText", "gridBackground", "magnetic", "noiseBackground", "parallax", "particleField", "reveal", "ripple", "scrollProgress", "shine", "spotlight", "spotlightBackground", "splitText", "stagger", "textHighlight", "textMask", "textReveal", "textScramble", "tilt", "typewriter", "waveBackground", ...easingNames].sort(),
+      ["PALETTE_CSS_VARIABLES", "activatePalette", "advancedGradientBackground", "animate", "animateParallel", "animatePreset", "animatePresetSequence", "animateProgress", "animateSequence", "animateSpring", "animateInertia", "animationPresetRegistry", "animationSequencePresetRegistry", "applyActivePalette", "applyMotionDNA", "applyPalette", "atmosphericBackground", "aurora", "borderBeam", "composeEffects", "cosmicBackground", "countUp", "createMotionChoreography", "createMotionRecipe", "createMotionStates", "createTimeline", "cursorTrail", "drag", "drawSVG", "easingRegistry", "easings", "energyBackground", "followPointer", "getActivePalette", "getAnimationPreset", "getAnimationSequencePreset", "getEasing", "getMotionDNA", "getPalette", "hoverMotion", "inView", "floatingOrbs", "fluidBackground", "glow", "geometricBackground", "gradientBackground", "gradientText", "gridBackground", "listPalettes", "magnetic", "magneticElement", "morphSVG", "motionDNARegistry", "noiseBackground", "paletteRegistry", "parallax", "particleBackground", "particleField", "pinch", "pointerGlow", "registerAnimationPreset", "registerAnimationSequencePreset", "registerEasing", "registerMotionDNA", "registerPalette", "removeAnimationPreset", "removeAnimationSequencePreset", "removeEasing", "removeMotionDNA", "removePalette", "resolveAdaptiveMotion", "resolvePaletteColors", "reveal", "ripple", "runMotionRecipe", "scrollAnimate", "scrollDirection", "scrollProgress", "scrollTrigger", "scrollVelocity", "shine", "splitText", "spotlight", "spotlightBackground", "stagger", "subscribeToPaletteChanges", "subscribeToPaletteColors", "swipe", "textHighlight", "textMask", "textReveal", "textScramble", "tilt", "typewriter", "waveBackground", ...easingNames].sort(),
     );
   });
 
   it("exports animateProgress as a function", () => {
     expect(typeof api.animateProgress).toBe("function");
+  });
+
+  it("exports repeat through the shared animation options", () => {
+    expectTypeOf<AnimationOptions["repeat"]>().toEqualTypeOf<number | undefined>();
+  });
+
+  it("exports the interactive pointer effects and their public types", () => {
+    expect(typeof api.pointerGlow).toBe("function");
+    expect(api.pointerGlow).toBe(api.spotlight);
+    expect(typeof api.magneticElement).toBe("function");
+    expect(api.magneticElement).toBe(api.magnetic);
+    expect(typeof api.hoverMotion).toBe("function");
+    expect(typeof api.followPointer).toBe("function");
+    expect(typeof api.drag).toBe("function");
+    expect(typeof api.swipe).toBe("function");
+    expect(typeof api.pinch).toBe("function");
+    expectTypeOf<PinchGesture["scale"]>().toBeNumber();
+    expectTypeOf<PinchOptions["onEnd"]>().toEqualTypeOf<((gesture: PinchGesture) => void) | undefined>();
+    expectTypeOf<PinchControls["destroy"]>().toBeFunction();
+    expectTypeOf<DragAxis>().toEqualTypeOf<"x" | "y" | "both">();
+    expectTypeOf<DragOptions["onDrag"]>().toBeFunction();
+    expectTypeOf<DragPosition["x"]>().toBeNumber();
+    expectTypeOf<DragControls["destroy"]>().toBeFunction();
+    expectTypeOf<SwipeDirection>().toEqualTypeOf<"left" | "right" | "up" | "down">();
+    expectTypeOf<SwipeGesture["distance"]>().toBeNumber();
+    expectTypeOf<SwipeOptions["onSwipe"]>().toBeFunction();
+    expectTypeOf<SwipeControls["destroy"]>().toBeFunction();
+    expectTypeOf<PointerGlowOptions["radius"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<PointerGlowControls["destroy"]>().toBeFunction();
+    expectTypeOf<MagneticOptions["distance"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<MagneticElementOptions["distance"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<MagneticControls["destroy"]>().toBeFunction();
+    expectTypeOf<MagneticElementControls["destroy"]>().toBeFunction();
+    expectTypeOf<HoverMotionOptions["enter"]>().toEqualTypeOf<HoverMotionValues | undefined>();
+    expectTypeOf<HoverMotionControls["destroy"]>().toBeFunction();
+    expectTypeOf<FollowPointerOptions["container"]>().toEqualTypeOf<HTMLElement | string>();
+    expectTypeOf<FollowPointerControls["destroy"]>().toBeFunction();
+  });
+
+  it("exports animateSpring and its public types", () => {
+    expect(typeof api.animateSpring).toBe("function");
+    expectTypeOf<SpringConfig>().toHaveProperty("stiffness");
+    expectTypeOf<SpringOptions["onUpdate"]>().toBeFunction();
+    expectTypeOf<SpringUpdate["position"]>().toBeNumber();
+    expectTypeOf<SpringControls["cancel"]>().toBeFunction();
+  });
+
+  it("exports animateInertia and its public types", () => {
+    expect(typeof api.animateInertia).toBe("function");
+    expectTypeOf<InertiaOptions["onUpdate"]>().toBeFunction();
+    expectTypeOf<InertiaUpdate["velocity"]>().toBeNumber();
+    expectTypeOf<InertiaControls["cancel"]>().toBeFunction();
+  });
+
+  it("exports scrollTrigger and its public types", () => {
+    expect(typeof api.scrollTrigger).toBe("function");
+    expectTypeOf<ScrollTriggerOptions["threshold"]>().toEqualTypeOf<number | number[] | undefined>();
+    expectTypeOf<ScrollTriggerControls["destroy"]>().toBeFunction();
+  });
+
+  it("exports inView and its public types", () => {
+    expect(typeof api.inView).toBe("function");
+    expectTypeOf<InViewCallback>().toBeFunction();
+    expectTypeOf<InViewControls["destroy"]>().toBeFunction();
+    expectTypeOf<InViewOptions["threshold"]>().toEqualTypeOf<number | number[] | undefined>();
+  });
+
+  it("exports the animation preset API and public types", () => {
+    expect(typeof api.animatePreset).toBe("function");
+    expect(typeof api.getAnimationPreset).toBe("function");
+    expect(typeof api.registerAnimationPreset).toBe("function");
+    expect(typeof api.removeAnimationPreset).toBe("function");
+    expect(typeof api.animationPresetRegistry.get).toBe("function");
+    expectTypeOf<AnimationPresetName>().toEqualTypeOf<
+      "fadeIn" | "fadeOut" | "slideUp" | "slideDown" | "scaleIn" | "scaleOut"
+    >();
+    expectTypeOf<AnimationPreset["properties"]>().toMatchTypeOf<Record<string, readonly [string | number, string | number]>>();
+    expectTypeOf<AnimationPresetOverrides["duration"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<AnimationPresetRegistry>().toHaveProperty("fadeIn");
+    expectTypeOf<AnimationPresetRegistryApi["register"]>().toBeFunction();
+  });
+
+  it("exports Motion DNA registration and option resolution", () => {
+    expect(typeof api.registerMotionDNA).toBe("function");
+    expect(typeof api.getMotionDNA).toBe("function");
+    expect(typeof api.removeMotionDNA).toBe("function");
+    expect(typeof api.applyMotionDNA).toBe("function");
+    expect(typeof api.motionDNARegistry.register).toBe("function");
+    expectTypeOf<MotionDNA["duration"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<MotionDNAOverrides["easing"]>().toEqualTypeOf<EasingOption | undefined>();
+    expectTypeOf<MotionDNARegistryApi["get"]>().toBeFunction();
+  });
+
+  it("exports adaptive motion profile resolution", () => {
+    expect(typeof api.resolveAdaptiveMotion).toBe("function");
+    expectTypeOf<AdaptiveMotionProfile["intensity"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<AdaptiveMotionConditions["reducedMotion"]>().toEqualTypeOf<boolean | undefined>();
+    expectTypeOf<AdaptiveMotionOverrides["duration"]>().toEqualTypeOf<number | undefined>();
+    expectTypeOf<AdaptiveReducedMotion>().toEqualTypeOf<"respect" | "ignore">();
+  });
+
+  it("exports palette-reactive color resolution and subscription types", () => {
+    expect(typeof api.resolvePaletteColors).toBe("function");
+    expect(typeof api.subscribeToPaletteColors).toBe("function");
+    expectTypeOf<PaletteColorOptions["palette"]>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<PaletteColorsListener>().toBeFunction();
+  });
+
+  it("exports reusable motion recipe APIs and types", () => {
+    expect(typeof api.createMotionRecipe).toBe("function");
+    expect(typeof api.runMotionRecipe).toBe("function");
+    expectTypeOf<MotionRecipe<Record<string, unknown>>["definition"]>()
+      .toMatchTypeOf<MotionRecipeDefinition<Record<string, unknown>>>();
+    expectTypeOf<MotionRecipeContext["motionDNA"]>().toBeFunction();
+    expectTypeOf<MotionRecipeControls["destroy"]>().toBeFunction();
+    expectTypeOf<MotionRecipeControls["pause"]>().toBeFunction();
+    expectTypeOf<MotionRecipeControls["resume"]>().toBeFunction();
+  });
+
+  it("exports named motion state controls and typed definitions", () => {
+    expect(typeof api.createMotionStates).toBe("function");
+    expectTypeOf<MotionStateDefinition["values"]>().toMatchTypeOf<Record<string, string | number>>();
+    expectTypeOf<MotionStateDefinitions>().toMatchTypeOf<Readonly<Record<string, MotionStateDefinition>>>();
+    expectTypeOf<MotionStateTransitionOptions["motionDNA"]>().toMatchTypeOf<
+      { name: string; overrides?: MotionDNAOverrides } | undefined
+    >();
+    expectTypeOf<MotionStateControls["currentState"]>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<MotionStateTransitionControls["finished"]>().toEqualTypeOf<Promise<void>>();
+  });
+
+  it("exports effect composition controller and entry types", () => {
+    expect(typeof api.composeEffects).toBe("function");
+    expectTypeOf<EffectCompositionControls["destroy"]>().toBeFunction();
+    expectTypeOf<EffectCompositionControls["pause"]>().toBeFunction();
+    expectTypeOf<EffectCompositionControls["resume"]>().toBeFunction();
+    expectTypeOf<EffectCompositionInstance>().toMatchTypeOf<{ destroy(): void } | { cancel(): void }>();
+    expectTypeOf<ComposableEffect>().toMatchTypeOf<EffectCompositionEntry | MotionDNACompositionEntry>();
+  });
+
+  it("exports motion choreography and its typed actions", () => {
+    expect(typeof api.createMotionChoreography).toBe("function");
+    expectTypeOf<MotionChoreographyControls["cancel"]>().toBeFunction();
+    expectTypeOf<MotionChoreographyAction>().toMatchTypeOf<
+      MotionChoreographyAnimation | MotionChoreographyParallel
+    >();
+    expectTypeOf<MotionChoreographyEffect["effect"]>().toMatchTypeOf<ComposableEffect>();
+  });
+
+  it("exports animateSequence and its public types", () => {
+    expect(typeof api.animateSequence).toBe("function");
+    expectTypeOf<AnimationSequenceStep["target"]>().toEqualTypeOf<HTMLElement | string>();
+    expectTypeOf<AnimationSequenceOptions["onComplete"]>().toEqualTypeOf<(() => void) | undefined>();
+    expectTypeOf<AnimationSequenceControls["finished"]>().toEqualTypeOf<Promise<void>>();
+  });
+
+  it("exports animateParallel and its public types", () => {
+    expect(typeof api.animateParallel).toBe("function");
+    expectTypeOf<AnimationParallelStep["target"]>().toEqualTypeOf<HTMLElement | string>();
+    expectTypeOf<AnimationParallelStep["options"]>().toEqualTypeOf<DOMAnimationOptions | undefined>();
+    expectTypeOf<AnimationParallelOptions["onComplete"]>().toEqualTypeOf<(() => void) | undefined>();
+    expectTypeOf<AnimationParallelControls["finished"]>().toEqualTypeOf<Promise<void>>();
+  });
+
+  it("exports createTimeline and its public types", () => {
+    expect(typeof api.createTimeline).toBe("function");
+    expectTypeOf<AnimationTimelineStep["at"]>().toEqualTypeOf<AnimationTimelinePosition>();
+    expectTypeOf<AnimationTimelinePosition>().toEqualTypeOf<
+      number | string | { label: string; offset?: number } | { previous: "start" | "end"; offset?: number }
+    >();
+    expectTypeOf<AnimationTimelineStep["target"]>().toEqualTypeOf<HTMLElement | string>();
+    expectTypeOf<AnimationTimelineStep["options"]>().toEqualTypeOf<DOMAnimationOptions | undefined>();
+    expectTypeOf<AnimationTimelineControls["finished"]>().toEqualTypeOf<Promise<void>>();
+    expectTypeOf<AnimationTimelineControls["play"]>().toBeFunction();
   });
 
   it("exports aurora and its public types", () => {
@@ -218,6 +473,23 @@ describe("public API", () => {
     expect(typeof api.scrollProgress).toBe("function");
     expectTypeOf<ScrollProgressOptions["position"]>().toEqualTypeOf<ScrollProgressPosition | undefined>();
     expectTypeOf<ScrollProgressControls["destroy"]>().toBeFunction();
+    expectTypeOf<ScrollProgressOptions["onUpdate"]>().toEqualTypeOf<((progress: number) => void) | undefined>();
+    expectTypeOf<ScrollProgressControls["getProgress"]>().toEqualTypeOf<() => number>();
+  });
+
+  it("exports scrollVelocity and its public types", () => {
+    expect(typeof api.scrollVelocity).toBe("function");
+    expectTypeOf<ScrollVelocityOptions["onUpdate"]>().toBeFunction();
+    expectTypeOf<ScrollVelocityData["direction"]>().toEqualTypeOf<ScrollVelocityDirection>();
+    expectTypeOf<ScrollVelocityData["position"]>().toEqualTypeOf<number>();
+    expectTypeOf<ScrollVelocityControls["destroy"]>().toBeFunction();
+  });
+
+  it("exports scrollDirection and its public types", () => {
+    expect(typeof api.scrollDirection).toBe("function");
+    expectTypeOf<ScrollDirectionOptions["onChange"]>().toBeFunction();
+    expectTypeOf<ScrollDirection>().toEqualTypeOf<"up" | "down" | "idle">();
+    expectTypeOf<ScrollDirectionControls["destroy"]>().toBeFunction();
   });
 
   it.each(easingNames)("exports %s and registers it in easings", (name) => {
@@ -228,8 +500,20 @@ describe("public API", () => {
   it("exposes public types", () => {
     expectTypeOf<EasingName>().toEqualTypeOf<(typeof easingNames)[number]>();
     expectTypeOf<EasingRegistry[EasingName]>().toEqualTypeOf<EasingFunction>();
-    expectTypeOf<AnimationOptions["easing"]>().toEqualTypeOf<EasingFunction | undefined>();
+    expectTypeOf<AnimationOptions["easing"]>().toEqualTypeOf<EasingOption | undefined>();
+    expectTypeOf<AnimationOptions["onStart"]>().toEqualTypeOf<(() => void) | undefined>();
+    expectTypeOf<AnimationOptions["onUpdate"]>().toEqualTypeOf<((progress: number) => void) | undefined>();
+    expectTypeOf<AnimationOptions["onCancel"]>().toEqualTypeOf<(() => void) | undefined>();
+    expectTypeOf<EasingRegistryApi["register"]>().toBeFunction();
     expectTypeOf<AnimationControls["cancel"]>().toBeFunction();
+  });
+
+  it("exports the named easing registry API", () => {
+    expect(typeof api.registerEasing).toBe("function");
+    expect(typeof api.getEasing).toBe("function");
+    expect(typeof api.removeEasing).toBe("function");
+    expect(typeof api.easingRegistry.register).toBe("function");
+    expectTypeOf<EasingOption>().toEqualTypeOf<string | EasingFunction>();
   });
 });
 

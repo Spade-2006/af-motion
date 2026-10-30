@@ -1,5 +1,10 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  releaseBackgroundTarget as releaseTarget,
+} from "./internal/canvas-lifecycle.js";
 
 export interface SpotlightBackgroundOptions {
   /** CSS color of the glow. Defaults to violet. */
@@ -17,19 +22,6 @@ export interface SpotlightBackgroundControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface SpotlightState {
   element: HTMLElement;
   layer: HTMLDivElement;
@@ -42,49 +34,6 @@ const DEFAULT_COLOR = "#7c3aed";
 const DEFAULT_RADIUS_PX = 300;
 const DEFAULT_INTENSITY = 0.35;
 const DEFAULT_SMOOTHING_SECONDS = 0.15;
-
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
 
 function validateColor(color: string): void {
   if (typeof color !== "string" || color.trim() === "") {
@@ -184,9 +133,7 @@ export function spotlightBackground(
     );
   }
 
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  let reducedMotion = mediaQuery?.matches === true;
+  let reducedMotion = prefersReducedMotion();
   const states = elements.map((element) => createState(element, color, radius, intensity, smoothing));
   const inserted: SpotlightState[] = [];
   const acquired: HTMLElement[] = [];
@@ -215,9 +162,9 @@ export function spotlightBackground(
     throw error;
   }
 
-  const onMotionChange = (event: MediaQueryListEvent): void => {
+  const stopMotionListener = onReducedMotionChange((preference) => {
     if (destroyed) return;
-    reducedMotion = event.matches;
+    reducedMotion = preference;
     for (const state of states) {
       if (reducedMotion) {
         state.element.removeEventListener("pointermove", state.onPointerMove);
@@ -230,14 +177,13 @@ export function spotlightBackground(
         state.element.addEventListener("pointercancel", state.onPointerLeave);
       }
     }
-  };
-  mediaQuery?.addEventListener?.("change", onMotionChange);
+  });
 
   return {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      stopMotionListener();
       for (const state of states) {
         state.element.removeEventListener("pointermove", state.onPointerMove);
         state.element.removeEventListener("pointerleave", state.onPointerLeave);

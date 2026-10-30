@@ -58,6 +58,7 @@ class FakeCanvas extends FakeHTMLElement {
   width = 0;
   height = 0;
   context = {
+    setTransform: vi.fn(),
     createImageData: vi.fn((width: number, height: number) => ({
       width,
       height,
@@ -98,6 +99,8 @@ let reducedMotion: boolean;
 let motionListeners: Set<(event: { matches: boolean }) => void>;
 let frames: Map<number, FrameRequestCallback>;
 let nextFrameId: number;
+let documentHidden: boolean;
+let documentListeners: Map<string, Set<EventListener>>;
 
 function makeElement(): FakeHTMLElement {
   return new FakeHTMLElement();
@@ -123,6 +126,8 @@ beforeEach(() => {
   motionListeners = new Set();
   frames = new Map();
   nextFrameId = 1;
+  documentHidden = false;
+  documentListeners = new Map();
   FakeResizeObserver.instances = [];
   vi.stubGlobal("HTMLElement", FakeHTMLElement);
   vi.stubGlobal("matchMedia", () => ({
@@ -149,10 +154,19 @@ beforeEach(() => {
     isolation: element.style.getPropertyValue("isolation") || "auto",
   }));
   vi.stubGlobal("document", {
+    get hidden() {
+      return documentHidden;
+    },
     createElement: (name: string) => {
       if (name === "canvas") return new FakeCanvas();
       throw new Error(`Unexpected element: ${name}`);
     },
+    addEventListener: (type: string, listener: EventListener) => {
+      const listeners = documentListeners.get(type) ?? new Set<EventListener>();
+      listeners.add(listener);
+      documentListeners.set(type, listeners);
+    },
+    removeEventListener: (type: string, listener: EventListener) => documentListeners.get(type)?.delete(listener),
     querySelectorAll: (selector: string) => {
       if (selector === "!!bad") throw new DOMException("bad selector", "SyntaxError");
       return selectorResults[selector] ?? [];
@@ -222,6 +236,35 @@ describe("noiseBackground()", () => {
     expect(frames.size).toBe(0);
     expect(first.children).toHaveLength(0);
     expect(second.children).toHaveLength(0);
+  });
+
+  it("pauses while hidden and releases the canvas backing store on destroy", () => {
+    const element = makeElement();
+    const controls = noiseBackground(asHTMLElement(element), { speed: 5 });
+    const canvas = canvasOf(element);
+    expect(frames.size).toBe(1);
+
+    documentHidden = true;
+    for (const listener of documentListeners.get("visibilitychange") ?? []) {
+      listener(new Event("visibilitychange"));
+    }
+    expect(frames.size).toBe(0);
+
+    documentHidden = false;
+    for (const listener of documentListeners.get("visibilitychange") ?? []) {
+      listener(new Event("visibilitychange"));
+    }
+    expect(frames.size).toBe(1);
+
+    documentHidden = true;
+    for (const listener of documentListeners.get("visibilitychange") ?? []) {
+      listener(new Event("visibilitychange"));
+    }
+    expect(frames.size).toBe(0);
+    controls.destroy();
+    expect(canvas.width).toBe(0);
+    expect(canvas.height).toBe(0);
+    expect(documentListeners.get("visibilitychange")?.size).toBe(0);
   });
 
   it("renders static noise with reduced motion and resumes only when preference allows", () => {

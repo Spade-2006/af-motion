@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { tilt } from "../src/effects/tilt";
+import { magnetic } from "../src/effects/magnetic";
 
 class FakeStyle {
   values = new Map<string, string>();
@@ -388,6 +389,34 @@ describe("tilt: style preservation", () => {
     element.emit("pointerleave");
     settle(4000);
     expect(transformOf(element)).toBe("translateX(10px)");
+  });
+});
+
+describe("transform effect composition", () => {
+  it("lets magnetic and tilt coexist and clean up independently", () => {
+    const element = makeElement();
+    element.style.setProperty("transform", "rotate(10deg)");
+    const magneticControls = magnetic(asHTML(element), {
+      strength: 0.5,
+      maxTranslate: 20,
+      duration: 100,
+      easing: (progress) => progress,
+    });
+    const tiltControls = tilt(asHTML(element), linear);
+
+    move(element, 250, 150);
+    settle();
+    expect(transformOf(element)).toBe(
+      "rotate(10deg) translate(20px, 0px) perspective(800px) rotateX(0deg) rotateY(5deg) scale(1.1)",
+    );
+
+    magneticControls.destroy();
+    expect(transformOf(element)).toBe(
+      "rotate(10deg) perspective(800px) rotateX(0deg) rotateY(5deg) scale(1.1)",
+    );
+
+    tiltControls.destroy();
+    expect(transformOf(element)).toBe("rotate(10deg)");
   });
 });
 

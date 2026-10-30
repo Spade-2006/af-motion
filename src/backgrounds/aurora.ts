@@ -1,5 +1,10 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  releaseBackgroundTarget as releaseTarget,
+} from "./internal/canvas-lifecycle.js";
 
 export interface AuroraOptions {
   /** CSS colors used to create the aurora gradient. Defaults to a violet/cyan/pink palette. */
@@ -12,24 +17,13 @@ export interface AuroraOptions {
   opacity?: number;
   /** Overlay corner radius in pixels. Must be >= 0. Defaults to 24. */
   borderRadius?: number;
+  /** Number of flowing gradient ribbons from 1 to 8. Defaults to 3. */
+  waveCount?: number;
 }
 
 export interface AuroraControls {
   /** Removes the background, injected keyframes and any temporary target styles. Safe to repeat. */
   destroy(): void;
-}
-
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
 }
 
 const DEFAULT_COLORS = ["#7c3aed", "#06b6d4", "#ec4899"] as const;
@@ -38,20 +32,7 @@ const DEFAULT_BLUR_PX = 60;
 const DEFAULT_OPACITY = 0.7;
 const DEFAULT_BORDER_RADIUS_PX = 24;
 
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
 let nextAnimationId = 0;
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
 
 function assertFinite(name: string, value: number, minimum: number, maximum = Number.POSITIVE_INFINITY): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {
@@ -72,38 +53,6 @@ function validateColors(colors: readonly string[]): void {
       throw new TypeError(`Invalid CSS color "${color}"`);
     }
   }
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) {
-    element.style.setProperty("position", "relative");
-  }
-  if (restoreIsolation) {
-    element.style.setProperty("isolation", "isolate");
-  }
-  record = { count: 1, position, isolation, restorePosition, restoreIsolation };
-  targetRecords.set(element, record);
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
 }
 
 function createStylesheet(animationName: string): HTMLStyleElement {
@@ -131,9 +80,13 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
     blur = DEFAULT_BLUR_PX,
     opacity = DEFAULT_OPACITY,
     borderRadius = DEFAULT_BORDER_RADIUS_PX,
+    waveCount = 3,
   } = options;
 
   validateColors(colors);
+  if (!Number.isInteger(waveCount) || waveCount < 1 || waveCount > 8) {
+    throw new RangeError(`waveCount must be an integer from 1 to 8, received ${String(waveCount)}`);
+  }
   assertFinite("speed", speed, Number.MIN_VALUE);
   assertFinite("blur", blur, 0);
   assertFinite("opacity", opacity, 0, 1);
@@ -149,9 +102,7 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
 
   const animationName = `af-motion-aurora-${++nextAnimationId}`;
   const stylesheet = createStylesheet(animationName);
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  const reducedMotion = mediaQuery?.matches === true;
+  const reducedMotion = prefersReducedMotion();
   const overlays: HTMLDivElement[] = [];
   const acquired: HTMLElement[] = [];
   let destroyed = false;
@@ -164,11 +115,21 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
       overlay.style.setProperty("inset", "-20%");
       overlay.style.setProperty("z-index", "-1");
       overlay.style.setProperty("pointer-events", "none");
-      overlay.style.setProperty("background", [
-        `radial-gradient(ellipse at 20% 20%, ${colors[0]}, transparent 60%)`,
-        `radial-gradient(ellipse at 80% 30%, ${colors[1]}, transparent 55%)`,
-        `radial-gradient(ellipse at 50% 85%, ${colors[2 % colors.length]}, transparent 60%)`,
-      ].join(", "));
+      const ribbons = waveCount === 3
+        ? [
+            `radial-gradient(ellipse at 20% 20%, ${colors[0]}, transparent 60%)`,
+            `radial-gradient(ellipse at 80% 30%, ${colors[1]}, transparent 55%)`,
+            `radial-gradient(ellipse at 50% 85%, ${colors[2 % colors.length]}, transparent 60%)`,
+          ]
+        : Array.from({ length: waveCount }, (_, index) => {
+            const progress = index / waveCount;
+            const x = Math.round(14 + progress * 72);
+            const y = Math.round(18 + (index % 2) * 55 + progress * 12);
+            const color = colors[index % colors.length] ?? colors[0];
+            const falloff = index % 2 === 0 ? 60 : 55;
+            return `radial-gradient(ellipse at ${x}% ${y}%, ${color}, transparent ${falloff}%)`;
+          });
+      overlay.style.setProperty("background", ribbons.join(", "));
       overlay.style.setProperty("filter", `blur(${blur}px)`);
       overlay.style.setProperty("opacity", String(opacity));
       overlay.style.setProperty("border-radius", `${borderRadius}px`);
@@ -190,10 +151,10 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
     throw error;
   }
 
-  const onMotionChange = (event: MediaQueryListEvent): void => {
+  const stopMotionListener = onReducedMotionChange((reducedMotion) => {
     if (destroyed) return;
     for (const overlay of overlays) {
-      if (event.matches) {
+      if (reducedMotion) {
         overlay.style.removeProperty("animation");
         overlay.style.setProperty("will-change", "auto");
       } else {
@@ -201,14 +162,13 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
         overlay.style.setProperty("animation", `${animationName} ${speed}s ease-in-out infinite`);
       }
     }
-  };
-  mediaQuery?.addEventListener?.("change", onMotionChange);
+  });
 
   return {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      stopMotionListener();
       for (let index = 0; index < overlays.length; index++) {
         const overlay = overlays[index];
         const element = elements[index];

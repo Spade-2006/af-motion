@@ -17,9 +17,13 @@ export interface ScrollProgressOptions {
   easing?: number;
   /** Scrollable element (or selector resolving to exactly one element) to track instead of the page. */
   target?: AnimateTarget;
+  /** Called when the measured normalized scroll progress changes. */
+  onUpdate?: (progress: number) => void;
 }
 
 export interface ScrollProgressControls {
+  /** Returns the latest measured normalized scroll progress. */
+  getProgress(): number;
   /** Cancels pending updates, removes listeners and the generated bar. Safe to repeat. */
   destroy(): void;
 }
@@ -80,9 +84,13 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
     smoothing: smoothingOption,
     easing,
     target,
+    onUpdate,
   } = options;
   const smoothing = smoothingOption ?? easing ?? DEFAULT_SMOOTHING;
 
+  if (onUpdate !== undefined && typeof onUpdate !== "function") {
+    throw new TypeError("onUpdate must be a function");
+  }
   if (position !== "top" && position !== "bottom") {
     throw new TypeError(`position must be "top" or "bottom", received ${String(position)}`);
   }
@@ -98,7 +106,7 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
       throw new RangeError("scrollProgress() target must resolve to exactly one element");
     }
     scrollTarget = targets[0] ?? null;
-    if (!scrollTarget) return { destroy: () => undefined };
+    if (!scrollTarget) return { getProgress: () => 0, destroy: () => undefined };
   }
 
   if (typeof document === "undefined" || typeof document.createElement !== "function") {
@@ -138,6 +146,8 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
   let destroyed = false;
   let frameId: number | null = null;
   let latestProgress = 0;
+  let currentProgress = 0;
+  let hasPublishedProgress = false;
 
   const readProgress = (): number => {
     const metrics = scrollTarget ? elementMetrics(scrollTarget) : pageMetrics();
@@ -147,14 +157,21 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
     if (destroyed) return;
     bar.style.setProperty("transform", `scaleX(${progress})`);
   };
+  const publishProgress = (progress: number): void => {
+    latestProgress = progress;
+    if (hasPublishedProgress && progress === currentProgress) return;
+    currentProgress = progress;
+    hasPublishedProgress = true;
+    render(progress);
+    onUpdate?.(progress);
+  };
   const updateImmediately = (): void => {
     if (destroyed) return;
     if (frameId !== null) {
       cancelAnimationFrame(frameId);
       frameId = null;
     }
-    latestProgress = readProgress();
-    render(latestProgress);
+    publishProgress(readProgress());
   };
   const scheduleUpdate = (): void => {
     if (destroyed) return;
@@ -166,15 +183,22 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
     if (frameId !== null) return;
     frameId = requestAnimationFrame(() => {
       frameId = null;
-      render(latestProgress);
+      publishProgress(latestProgress);
     });
   };
 
   parent.appendChild(bar);
-  updateImmediately();
   const eventTarget = scrollTarget ?? window;
   eventTarget.addEventListener("scroll", scheduleUpdate, { passive: true });
-  if (!scrollTarget) window.addEventListener("resize", scheduleUpdate, { passive: true });
+  // Container metrics change with content or layout size, which never fires a scroll event.
+  let resizeObserver: ResizeObserver | null = null;
+  if (!scrollTarget) {
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+  } else if (typeof ResizeObserver !== "undefined") {
+    resizeObserver = new ResizeObserver(scheduleUpdate);
+    resizeObserver.observe(scrollTarget);
+    for (const child of Array.from(scrollTarget.children ?? [])) resizeObserver.observe(child);
+  }
 
   const stopPreferenceListener = onReducedMotionChange((reduced) => {
     if (destroyed || reduced === reducedMotion) return;
@@ -183,13 +207,26 @@ export function scrollProgress(options: ScrollProgressOptions = {}): ScrollProgr
     updateImmediately();
   });
 
+  try {
+    updateImmediately();
+  } catch (error) {
+    stopPreferenceListener();
+    resizeObserver?.disconnect();
+    eventTarget.removeEventListener("scroll", scheduleUpdate);
+    if (!scrollTarget) window.removeEventListener("resize", scheduleUpdate);
+    if (bar.parentElement === parent) parent.removeChild(bar);
+    throw error;
+  }
+
   return {
+    getProgress: () => latestProgress,
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
       stopPreferenceListener();
       if (frameId !== null) cancelAnimationFrame(frameId);
       frameId = null;
+      resizeObserver?.disconnect();
       eventTarget.removeEventListener("scroll", scheduleUpdate);
       if (!scrollTarget) window.removeEventListener("resize", scheduleUpdate);
       if (bar.parentElement === parent) parent.removeChild(bar);

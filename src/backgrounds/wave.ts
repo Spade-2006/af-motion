@@ -1,5 +1,10 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
+import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import {
+  acquireBackgroundTarget as acquireTarget,
+  releaseBackgroundTarget as releaseTarget,
+} from "./internal/canvas-lifecycle.js";
 
 export interface WaveBackgroundOptions {
   /** CSS colors filled by the waves. Defaults to violet and cyan. */
@@ -19,19 +24,6 @@ export interface WaveBackgroundControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 const DEFAULT_COLORS = ["#7c3aed", "#06b6d4"] as const;
 const DEFAULT_AMPLITUDE = 30;
 const DEFAULT_FREQUENCY = 2;
@@ -40,50 +32,7 @@ const DEFAULT_OPACITY = 0.6;
 const SVG_WIDTH = 1000;
 const SVG_HEIGHT = 300;
 
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
 let nextAnimationId = 0;
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  let record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
-
 function validateColors(colors: readonly string[]): void {
   if (!Array.isArray(colors) || colors.length === 0) {
     throw new TypeError("colors must be an array containing at least one CSS color");
@@ -162,9 +111,7 @@ export function waveBackground(
 
   const animationName = `af-motion-wave-${++nextAnimationId}`;
   const stylesheet = createStylesheet(animationName, amplitude);
-  const mediaQuery =
-    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : undefined;
-  const reducedMotion = mediaQuery?.matches === true;
+  const reducedMotion = prefersReducedMotion();
   const svgs: SVGSVGElement[] = [];
   const acquired: HTMLElement[] = [];
   let destroyed = false;
@@ -214,11 +161,11 @@ export function waveBackground(
     throw error;
   }
 
-  const onMotionChange = (event: MediaQueryListEvent): void => {
+  const stopMotionListener = onReducedMotionChange((reducedMotion) => {
     if (destroyed) return;
     for (const svg of svgs) {
       for (const path of Array.from(svg.children) as SVGPathElement[]) {
-        if (event.matches || speed === 0 || amplitude === 0) path.style.removeProperty("animation");
+        if (reducedMotion || speed === 0 || amplitude === 0) path.style.removeProperty("animation");
         else {
           const waveIndex = Array.from(svg.children).indexOf(path);
           path.style.setProperty(
@@ -228,14 +175,13 @@ export function waveBackground(
         }
       }
     }
-  };
-  mediaQuery?.addEventListener?.("change", onMotionChange);
+  });
 
   return {
     destroy: () => {
       if (destroyed) return;
       destroyed = true;
-      mediaQuery?.removeEventListener?.("change", onMotionChange);
+      stopMotionListener();
       for (let index = 0; index < svgs.length; index++) {
         const svg = svgs[index];
         const element = elements[index];
