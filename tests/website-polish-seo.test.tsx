@@ -106,7 +106,7 @@ describe("Prompt 156 — Website Performance, SEO & Responsive Polish", () => {
       expect(Array.isArray(graph["@graph"])).toBe(true);
       const appNode = graph["@graph"].find((n) => n["@type"] === "SoftwareApplication");
       expect(appNode?.name).toBe("AF Motion");
-      expect(appNode?.softwareVersion).toBe("0.1.0");
+      expect(appNode?.softwareVersion).toBe("1.0.0");
       expect(appNode?.aggregateRating).toBeUndefined();
       expect(appNode?.offers).toBeUndefined();
     });

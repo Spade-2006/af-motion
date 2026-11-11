@@ -259,7 +259,7 @@ describe("Prompt 98 — Complete Documentation System", () => {
       expect(container.querySelector(".docs-root-container")).not.toBeNull();
       expect(container.querySelector(".docs-header")).not.toBeNull();
       expect(container.querySelector(".docs-brand-logo")?.textContent).toContain("AF Motion");
-      expect(container.querySelector(".docs-version-badge")?.textContent).toBe("v0.1.0");
+      expect(container.querySelector(".docs-version-badge")?.textContent).toBe("v1.0.0");
       expect(container.querySelector(".docs-search-trigger")).not.toBeNull();
       expect(container.querySelector(".docs-sidebar")).not.toBeNull();
       expect(container.querySelector(".docs-article-body")).not.toBeNull();

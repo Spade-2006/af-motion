@@ -27,7 +27,7 @@ export * from "./commands/example.js";
 export * from "./utils/terminal.js";
 export * from "./utils/templates.js";
 
-const CLI_VERSION = "0.1.0";
+const CLI_VERSION = "1.0.0";
 
 export function printHelp(): void {
   console.log(term.banner("AF Motion CLI (Auto Flow Motion)", `v${CLI_VERSION}`));

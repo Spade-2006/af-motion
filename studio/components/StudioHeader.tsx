@@ -24,7 +24,7 @@ export const StudioHeader: React.FC<StudioHeaderProps> = ({
     <header className="studio-header">
       <div className="studio-brand">
         <span className="studio-logo">✨ AF Motion Studio</span>
-        <span className="studio-version">v0.1.0</span>
+        <span className="studio-version">v1.0.0</span>
       </div>
 
       <nav className="studio-tabs" aria-label="Studio Navigation">

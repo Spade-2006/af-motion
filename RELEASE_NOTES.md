@@ -1,4 +1,4 @@
-# AF Motion — V1 Release Notes (`v0.1.0`)
+# AF Motion — V1 Release Notes (`v1.0.0`)
 
 ## Product Overview
 

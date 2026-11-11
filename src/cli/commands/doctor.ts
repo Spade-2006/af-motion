@@ -93,7 +93,7 @@ export function runDoctorChecks(cwd: string): DoctorReport {
         category: "dependencies",
         name: "AF Motion Package",
         status: "pass",
-        message: `Running inside af-motion repository codebase (v${pkg.version || "0.1.0"}).`,
+        message: `Running inside af-motion repository codebase (v${pkg.version || "1.0.0"}).`,
       });
     } else if (depVersion) {
       checks.push({

@@ -1,10 +1,10 @@
 # Changelog
 
-All notable changes for **Auto Flow Motion (`af-motion` / AF Motion)** leading into V1 Release Readiness (`0.1.0`) are documented below.
+All notable changes for **Auto Flow Motion (`af-motion` / AF Motion)** leading into V1 Release Readiness (`1.0.0`) are documented below.
 
 ---
 
-## [0.1.0] — V1 Release Candidate
+## [1.0.0] — V1 Release Candidate
 
 ### Added
 - **Core Motion Engine (`af-motion`)**: Web Animations and shared `requestAnimationFrame` progress engine (`animate`, `animateProgress`), damped physical spring and inertia solvers (`animateSpring`, `animateInertia`), custom easing registry (`easings`, `registerEasing`, `getEasing`, `removeEasing`), multi-track timeline choreography (`createTimeline`), layered transform composition (`magnetic`, `tilt`, `parallax`), scroll triggers/observers (`reveal`, `stagger`, `inView`, `scrollProgress`, `scrollVelocity`, `scrollTrigger`), canvas backgrounds (`aurora`, `particleField`), and 33 built-in semantic color palettes.

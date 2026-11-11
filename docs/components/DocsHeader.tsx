@@ -27,7 +27,7 @@ export const DocsHeader: React.FC<DocsHeaderProps> = ({
           <span className="docs-brand-logo">✨ AF Motion</span>
           <span className="docs-brand-tag">Docs</span>
         </a>
-        <span className="docs-version-badge">v0.1.0</span>
+        <span className="docs-version-badge">v1.0.0</span>
       </div>
 
       {/* Global Quick Search Button */}

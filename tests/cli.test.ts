@@ -256,7 +256,7 @@ describe("Prompt 149 — Developer Tooling & CLI Experience", () => {
     it("returns accurate capability counts matching repository truth", () => {
       const info = getCapabilityInfo();
 
-      expect(info.version).toBe("0.1.0");
+      expect(info.version).toBe("1.0.0");
       expect(info.subpaths.core).toBe("af-motion");
       expect(info.subpaths.react).toBe("af-motion/react");
       expect(info.subpaths.catalogue).toBe("af-motion/catalogue");
@@ -321,7 +321,7 @@ describe("Prompt 149 — Developer Tooling & CLI Experience", () => {
       const stdout = execFileSync(process.execPath, [binPath, "--version"], {
         encoding: "utf8",
       });
-      expect(stdout.trim()).toBe("af-motion v0.1.0");
+      expect(stdout.trim()).toBe("af-motion v1.0.0");
     });
 
     it("executes af-motion info --json via subprocess and parses valid JSON", () => {
@@ -329,7 +329,7 @@ describe("Prompt 149 — Developer Tooling & CLI Experience", () => {
         encoding: "utf8",
       });
       const parsed = JSON.parse(stdout);
-      expect(parsed.version).toBe("0.1.0");
+      expect(parsed.version).toBe("1.0.0");
       expect(parsed.palettesCount).toBe(33);
       expect(parsed.visualStylesCount).toBe(19);
     });

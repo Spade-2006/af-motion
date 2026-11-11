@@ -15,7 +15,7 @@ export function getCapabilityInfo(): AFMotionCapabilityInfo {
   const isCI = typeof process !== "undefined" && Boolean(process.env.CI);
 
   return {
-    version: "0.1.0",
+    version: "1.0.0",
     subpaths: {
       core: "af-motion",
       react: "af-motion/react",

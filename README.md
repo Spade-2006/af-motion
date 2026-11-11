@@ -1,5 +1,7 @@
 # AF Motion (Auto Flow Motion)
 
+**Version:** 1.0.0
+
 **Auto Flow Motion (AF Motion)** is a framework-independent JavaScript and TypeScript animation engine paired with optional React 19 bindings, spring and inertia physics, multi-track timelines, visual effects, 19 design styles, 33 curated palettes, 5 Motion DNA profiles, 3D/GPU tooling, deterministic AI Motion Intelligence, a developer CLI, and an offline Model Context Protocol (MCP) server.
 
 ---

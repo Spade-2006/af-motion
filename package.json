@@ -1,6 +1,6 @@
 {
   "name": "af-motion",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Auto Flow Motion (AF Motion) — a modern JavaScript animation engine and motion design toolkit for expressive, performant web experiences.",
   "type": "module",
   "sideEffects": false,

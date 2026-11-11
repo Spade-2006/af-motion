@@ -242,14 +242,14 @@ describe("Prompt 151 — Standalone Website Architecture & Design System", () =>
         root.render(
           <div>
             <Badge variant="glow">Active Badge</Badge>
-            <Tag active>v0.1.0</Tag>
+            <Tag active>v1.0.0</Tag>
             <CodeLabel code="npm install af-motion" prefix="$" />
           </div>
         );
       });
 
       expect(container.textContent).toContain("Active Badge");
-      expect(container.textContent).toContain("v0.1.0");
+      expect(container.textContent).toContain("v1.0.0");
       expect(container.textContent).toContain("npm install af-motion");
     });
 

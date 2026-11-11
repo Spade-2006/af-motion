@@ -7,7 +7,7 @@ export const SITE_CONFIG = {
   tagline: "Motion is not an effect. It's an experience.",
   description:
     "Auto Flow Motion (AF Motion) — a framework-independent JavaScript animation engine with React bindings, spring physics, 19 visual design styles, 33 palettes, and deterministic AI Motion Intelligence.",
-  version: "0.1.0",
+  version: "1.0.0",
   links: {
     github: "https://github.com/Spade-2006/af-motion",
     npm: "https://www.npmjs.com/package/af-motion",

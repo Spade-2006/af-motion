@@ -14,7 +14,7 @@
   <circle cx="960" cy="240" r="180" fill="#6366f1" fill-opacity="0.16" />
   <circle cx="880" cy="360" r="140" fill="#06b6d4" fill-opacity="0.14" />
   <rect x="80" y="92" width="1040" height="446" rx="28" stroke="#ffffff" stroke-opacity="0.1" fill="#0a0d16" fill-opacity="0.82" />
-  <text x="140" y="210" fill="#38bdf8" font-family="monospace" font-size="22" letter-spacing="4">AF MOTION v0.1.0 · PURE ESM</text>
+  <text x="140" y="210" fill="#38bdf8" font-family="monospace" font-size="22" letter-spacing="4">AF MOTION v1.0.0 · PURE ESM</text>
   <text x="140" y="295" fill="#ffffff" font-family="system-ui, sans-serif" font-weight="800" font-size="62">Motion is not an effect.</text>
   <text x="140" y="365" fill="url(#accent)" font-family="system-ui, sans-serif" font-weight="800" font-size="62">It is an experience.</text>
   <text x="140" y="445" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="26">Framework-independent engine · React 18/19 · Springs · 3D &amp; GPU · Deterministic AI</text>
