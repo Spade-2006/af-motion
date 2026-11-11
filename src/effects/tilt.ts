@@ -15,6 +15,8 @@ export interface TiltOptions {
   scale?: number;
   /** Duration of each tilt/reset tween in milliseconds. Defaults to 300. */
   speed?: number;
+  /** Duration of each tilt/reset tween in milliseconds. Alias for speed. Defaults to 300. */
+  duration?: number;
   /** Defaults to `easings.easeOutCubic`. */
   easing?: EasingFunction;
 }
@@ -87,14 +89,17 @@ export function tilt(target: AnimateTarget, options: TiltOptions = {}): TiltCont
     maxTilt = DEFAULT_MAX_TILT_DEG,
     perspective = DEFAULT_PERSPECTIVE_PX,
     scale = DEFAULT_SCALE,
-    speed = DEFAULT_SPEED_MS,
+    speed: speedOption,
+    duration: durationOption,
     easing = easeOutCubic,
   } = options;
+  const speed = durationOption ?? speedOption ?? DEFAULT_SPEED_MS;
 
   assertFiniteNumber("maxTilt", maxTilt, { allowZero: true });
   assertFiniteNumber("perspective", perspective, { allowZero: false });
   assertFiniteNumber("scale", scale, { allowZero: false });
-  assertFiniteNumber("speed", speed, { allowZero: true });
+  if (speedOption !== undefined) assertFiniteNumber("speed", speedOption, { allowZero: true });
+  if (durationOption !== undefined) assertFiniteNumber("duration", durationOption, { allowZero: true });
   if (typeof easing !== "function") {
     throw new TypeError("easing must be a function");
   }

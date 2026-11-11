@@ -160,6 +160,25 @@ describe("typewriter()", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  it("fires onComplete when typing completes with loop false or reduced motion", () => {
+    const onComplete = vi.fn();
+    const element = new FakeHTMLElement("Old");
+    typewriter(asHTMLElement(element), {
+      phrases: ["Hi"],
+      typeSpeed: 10,
+      loop: false,
+      onComplete,
+    });
+    vi.advanceTimersByTime(30);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+
+    const reducedCb = vi.fn();
+    reducedMotion = true;
+    const reducedEl = new FakeHTMLElement("Old");
+    typewriter(asHTMLElement(reducedEl), { phrases: ["Final"], onComplete: reducedCb });
+    expect(reducedCb).toHaveBeenCalledTimes(1);
+  });
+
   it("validates phrases, timing, cursor and selector before changing text", () => {
     const element = new FakeHTMLElement("Untouched");
     expect(() => typewriter(asHTMLElement(element), { phrases: [] })).toThrow(TypeError);
@@ -168,6 +187,7 @@ describe("typewriter()", () => {
     expect(() => typewriter(asHTMLElement(element), { phrases: ["A"], deleteSpeed: -1 })).toThrow(RangeError);
     expect(() => typewriter(asHTMLElement(element), { phrases: ["A"], pause: -1 })).toThrow(RangeError);
     expect(() => typewriter(asHTMLElement(element), { phrases: ["A"], cursor: 1 as unknown as string })).toThrow(TypeError);
+    expect(() => typewriter(asHTMLElement(element), { phrases: ["A"], onComplete: "invalid" as never })).toThrow(TypeError);
     expect(() => typewriter("!!bad", { phrases: ["A"] })).toThrow(SyntaxError);
     expect(element.textContent).toBe("Untouched");
   });

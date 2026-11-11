@@ -7,8 +7,17 @@ import {
 
 class FakeStyle {
   values = new Map<string, string>();
+  getPropertyValue(name: string): string {
+    return this.values.get(name) ?? "";
+  }
+  getPropertyPriority(_name: string): string {
+    return "";
+  }
   setProperty(name: string, value: string): void {
     this.values.set(name, value);
+  }
+  removeProperty(name: string): void {
+    this.values.delete(name);
   }
 }
 

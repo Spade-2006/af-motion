@@ -141,12 +141,12 @@ export function spotlightBackground(
 
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.layer);
       acquired.push(state.element);
-      state.element.insertBefore(state.layer, state.element.firstChild);
       inserted.push(state);
       if (!reducedMotion) {
         state.element.addEventListener("pointermove", state.onPointerMove);
+        state.element.addEventListener("pointerdown", state.onPointerMove);
         state.element.addEventListener("pointerleave", state.onPointerLeave);
         state.element.addEventListener("pointercancel", state.onPointerLeave);
       }
@@ -154,11 +154,11 @@ export function spotlightBackground(
   } catch (error) {
     for (const state of inserted) {
       state.element.removeEventListener("pointermove", state.onPointerMove);
+      state.element.removeEventListener("pointerdown", state.onPointerMove);
       state.element.removeEventListener("pointerleave", state.onPointerLeave);
       state.element.removeEventListener("pointercancel", state.onPointerLeave);
-      if (state.layer.parentElement === state.element) state.element.removeChild(state.layer);
+      releaseTarget(state.element, state.layer);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -168,11 +168,13 @@ export function spotlightBackground(
     for (const state of states) {
       if (reducedMotion) {
         state.element.removeEventListener("pointermove", state.onPointerMove);
+        state.element.removeEventListener("pointerdown", state.onPointerMove);
         state.element.removeEventListener("pointerleave", state.onPointerLeave);
         state.element.removeEventListener("pointercancel", state.onPointerLeave);
         state.onPointerLeave();
       } else {
         state.element.addEventListener("pointermove", state.onPointerMove);
+        state.element.addEventListener("pointerdown", state.onPointerMove);
         state.element.addEventListener("pointerleave", state.onPointerLeave);
         state.element.addEventListener("pointercancel", state.onPointerLeave);
       }
@@ -186,10 +188,10 @@ export function spotlightBackground(
       stopMotionListener();
       for (const state of states) {
         state.element.removeEventListener("pointermove", state.onPointerMove);
+        state.element.removeEventListener("pointerdown", state.onPointerMove);
         state.element.removeEventListener("pointerleave", state.onPointerLeave);
         state.element.removeEventListener("pointercancel", state.onPointerLeave);
-        if (state.layer.parentElement === state.element) state.element.removeChild(state.layer);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.layer);
       }
     },
   };

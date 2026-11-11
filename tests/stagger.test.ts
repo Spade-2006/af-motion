@@ -415,4 +415,14 @@ describe("stagger: reduced motion", () => {
     flushFrame(50);
     expect([opacity(a), opacity(b)]).toEqual(["0.5", "0"]);
   });
+
+  it("safely handles repeated cancellation idempotently", () => {
+    const [a, b] = makeElements(2) as [HTMLElement, HTMLElement];
+    selectorResults[".card"] = [a, b];
+    const controls = stagger(".card", { ...fade, stagger: 50 });
+    expect(() => {
+      controls.cancel();
+      controls.cancel();
+    }).not.toThrow();
+  });
 });

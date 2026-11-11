@@ -1,0 +1,53 @@
+/**
+ * AF Motion Standalone Website — Design System Tokens
+ *
+ * Theme: Cinematic Dark Futuristic Creative Technology
+ * Characteristics:
+ * - Deep near-black backgrounds (#07080a, #0b0d11)
+ * - Sophisticated charcoal surfaces (#13161f, #1a1e2b, #222838)
+ * - Restrained electric accents (Cyan #38bdf8, Violet #818cf8, Indigo #6366f1)
+ * - Subtle atmospheric glow and fine borders
+ */
+
+:root {
+  /* Surface Hierarchies */
+  --bg-primary: #07080a;
+  --bg-secondary: #0b0d12;
+  --bg-tertiary: #10131a;
+  --surface-card: #131620;
+  --surface-card-hover: #181c29;
+  --surface-elevated: #1d2232;
+  --surface-overlay: rgba(11, 13, 18, 0.85);
+
+  /* Border & Dividers */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-default: rgba(255, 255, 255, 0.1);
+  --border-active: rgba(255, 255, 255, 0.2);
+  --border-glow: rgba(99, 102, 241, 0.35);
+
+  /* Typography / Text Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --text-faint: #334155;
+
+  /* Accent Spectrum */
+  --accent-cyan: #38bdf8;
+  --accent-cyan-glow: rgba(56, 189, 248, 0.25);
+  --accent-indigo: #6366f1;
+  --accent-indigo-glow: rgba(99, 102, 241, 0.25);
+  --accent-violet: #a855f7;
+  --accent-emerald: #10b981;
+  --accent-amber: #f59e0b;
+  --accent-rose: #f43f5e;
+
+  /* Shadows & Glows */
+  --shadow-subtle: 0 4px 20px -2px rgba(0, 0, 0, 0.7);
+  --shadow-elevated: 0 12px 36px -4px rgba(0, 0, 0, 0.8);
+  --glow-electric: 0 0 30px -5px rgba(99, 102, 241, 0.25);
+  --glow-cyan: 0 0 30px -5px rgba(56, 189, 248, 0.25);
+
+  /* Motion Curves (Matching AF Motion Core) */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-cubic: cubic-bezier(0.65, 0, 0.35, 1);
+}

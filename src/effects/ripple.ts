@@ -1,6 +1,7 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import { acquireEffectTarget, releaseEffectTarget } from "../core/transform.js";
 
 export type RippleOrigin = "pointer" | "center";
 
@@ -20,19 +21,6 @@ export interface RippleControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface ActiveWave {
   element: HTMLElement;
   animation: Animation;
@@ -49,47 +37,8 @@ const DEFAULT_COLOR = "rgba(255, 255, 255, 0.35)";
 const DEFAULT_DURATION = 600;
 const DEFAULT_SCALE = 2;
 const DEFAULT_ORIGIN: RippleOrigin = "pointer";
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  const current = targetRecords.get(element);
-  if (current) {
-    current.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
+const acquireTarget = acquireEffectTarget;
+const releaseTarget = releaseEffectTarget;
 
 function validateColor(color: string): void {
   if (typeof color !== "string" || color.trim() === "") {

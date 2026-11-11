@@ -2,6 +2,7 @@ import { animateProgress } from "./animation.js";
 import { prefersReducedMotion } from "./motion.js";
 import type { AnimationControls, AnimationOptions, EasingFunction } from "./animation.js";
 import { resolveEasing } from "../easing/easings.js";
+import { adaptAnimationOptions, type AdaptiveMotionConditions } from "./adaptive-motion.js";
 import type { EasingOption } from "../easing/easings.js";
 import { getTransformBase, setTransformBase } from "./transform.js";
 
@@ -37,6 +38,11 @@ export interface DOMAnimationOptions extends AnimationOptions {
    * `onComplete` still fires.
    */
   respectReducedMotion?: boolean;
+  /**
+   * Optional adaptive motion settings or conditions. When true or provided,
+   * duration scales according to runtime context (e.g. low power, intensity).
+   */
+  adaptive?: boolean | AdaptiveMotionConditions;
 }
 
 interface PropertyAnimation {
@@ -101,8 +107,12 @@ function readAnimatedProperty(element: HTMLElement | SVGElement, name: string): 
   const cssName = toCssName(name);
   if (cssName === "transform") return getTransformBase(element);
   return {
-    value: element.style.getPropertyValue(cssName) || null,
-    priority: element.style.getPropertyPriority(cssName),
+    value: typeof element.style.getPropertyValue === "function"
+      ? element.style.getPropertyValue(cssName) || null
+      : (element.style as unknown as Record<string, string>)[cssName] || null,
+    priority: typeof element.style.getPropertyPriority === "function"
+      ? element.style.getPropertyPriority(cssName)
+      : "",
   };
 }
 
@@ -573,6 +583,9 @@ export function animate(
   properties: AnimatableProperties,
   options: DOMAnimationOptions = {},
 ): AnimationControls {
+  const resolvedOptions = options.adaptive
+    ? adaptAnimationOptions(options, typeof options.adaptive === "object" ? options.adaptive : undefined)
+    : options;
   const {
     respectReducedMotion = true,
     propertyEasing,
@@ -581,7 +594,7 @@ export function animate(
     propertyDuration,
     fill,
     ...engineOptions
-  } = options;
+  } = resolvedOptions;
   if (fill !== undefined && !["none", "forwards", "backwards", "both"].includes(fill)) {
     throw new TypeError(`fill must be "none", "forwards", "backwards", or "both", received ${String(fill)}`);
   }

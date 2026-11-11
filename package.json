@@ -1,1 +1,112 @@
-{"name":"af-motion","version":"0.1.0","description":"A modern JavaScript animation and frontend effects toolkit","type":"module","sideEffects":false,"main":"./dist/index.js","module":"./dist/index.js","types":"./dist/index.d.ts","exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"},"./react":{"types":"./dist/react.d.ts","import":"./dist/react.js"}},"files":["dist"],"scripts":{"build":"vite build && tsc --emitDeclarationOnly --noEmit false","prepack":"npm run build","test":"vitest run","dev":"vite","studio":"vite --config studio/vite.config.ts","showcase":"vite --config showcase/vite.config.ts","typecheck":"tsc --noEmit"},"repository":{"type":"git","url":"https://github.com/Spade-2006/af-motion.git"},"keywords":["animation","javascript","frontend","effects"],"author":"Satyansh Acharya","license":"MIT","bugs":{"url":"https://github.com/Spade-2006/af-motion/issues"},"homepage":"https://github.com/Spade-2006/af-motion#readme","devDependencies":{"@types/node":"^26.6.5","@types/react":"^19.3.0","@types/react-dom":"^19.3.0","jsdom":"^26.1.0","react":"^19.3.1","react-dom":"^19.3.1","typescript":"^7.0.2","vite":"^8.3.5","vitest":"^5.0.5"},"peerDependencies":{"react":"^18.0.0 || ^19.0.0"}}
+{
+  "name": "af-motion",
+  "version": "0.1.0",
+  "description": "Auto Flow Motion (AF Motion) — a modern JavaScript animation engine and motion design toolkit for expressive, performant web experiences.",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "default": "./dist/react.js"
+    },
+    "./package.json": "./package.json",
+    "./catalogue": {
+      "types": "./dist/catalogue.d.ts",
+      "import": "./dist/catalogue.js",
+      "default": "./dist/catalogue.js"
+    },
+    "./catalog": {
+      "types": "./dist/catalogue.d.ts",
+      "import": "./dist/catalogue.js",
+      "default": "./dist/catalogue.js"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.js",
+      "default": "./dist/presets.js"
+    }
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "bin",
+    "CHANGELOG.md",
+    "RELEASE_NOTES.md"
+  ],
+  "scripts": {
+    "build": "vite build && tsc --emitDeclarationOnly --noEmit false",
+    "prepack": "npm run build",
+    "test": "vitest run",
+    "dev": "vite",
+    "docs": "vite --config docs/vite.config.ts",
+    "studio": "vite --config studio/vite.config.ts",
+    "showcase": "vite --config showcase/vite.config.ts",
+    "website": "vite --config website/vite.config.ts",
+    "website:build": "vite build --config website/vite.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Spade-2006/af-motion.git"
+  },
+  "keywords": [
+    "animation",
+    "auto-flow-motion",
+    "af-motion",
+    "react",
+    "spring",
+    "timeline",
+    "motion-design",
+    "3d",
+    "typescript",
+    "effects"
+  ],
+  "author": "Satyansh Acharya",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Spade-2006/af-motion/issues"
+  },
+  "homepage": "https://github.com/Spade-2006/af-motion#readme",
+  "devDependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "^0.187.0",
+    "jsdom": "^26.1.0",
+    "lucide-react": "^1.70.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwindcss": "^4.3.5",
+    "three": "^0.187.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "bin": {
+    "af-motion": "./bin/af-motion.js",
+    "af-motion-mcp": "./bin/mcp-server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

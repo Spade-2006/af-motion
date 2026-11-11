@@ -137,16 +137,18 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
       if (!reducedMotion) {
         overlay.style.setProperty("animation", `${animationName} ${speed}s ease-in-out infinite`);
       }
-      acquireTarget(element);
+      acquireTarget(element, overlay);
       acquired.push(element);
-      element.insertBefore(overlay, element.firstChild);
       overlays.push(overlay);
     }
   } catch (error) {
-    for (const overlay of overlays) {
-      overlay.parentElement?.removeChild(overlay);
+    for (let index = 0; index < overlays.length; index++) {
+      const overlay = overlays[index];
+      const element = acquired[index];
+      if (element && overlay) releaseTarget(element, overlay);
+      else if (element) releaseTarget(element);
+      else if (overlay?.parentElement) overlay.parentElement.removeChild(overlay);
     }
-    for (const element of acquired) releaseTarget(element);
     stylesheet.parentElement?.removeChild(stylesheet);
     throw error;
   }
@@ -173,8 +175,7 @@ export function aurora(target: AnimateTarget, options: AuroraOptions = {}): Auro
         const overlay = overlays[index];
         const element = elements[index];
         if (!overlay || !element) continue;
-        element.removeChild(overlay);
-        releaseTarget(element);
+        releaseTarget(element, overlay);
       }
       stylesheet.parentElement?.removeChild(stylesheet);
     },

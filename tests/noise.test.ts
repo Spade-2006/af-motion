@@ -304,6 +304,29 @@ describe("noiseBackground()", () => {
     expect(element.style.getPropertyValue("isolation")).toBe("");
   });
 
+  it("reuses ImageData allocation across animation frames until dimensions change", () => {
+    const element = makeElement();
+    const controls = noiseBackground(asHTMLElement(element), { speed: 10 });
+    const canvas = canvasOf(element);
+
+    expect(canvas.context.createImageData).toHaveBeenCalledTimes(1);
+    expect(canvas.context.putImageData).toHaveBeenCalledTimes(1);
+
+    flushFrame(100);
+    flushFrame(200);
+    flushFrame(300);
+
+    expect(canvas.context.putImageData.mock.calls.length).toBeGreaterThan(1);
+    expect(canvas.context.createImageData).toHaveBeenCalledTimes(1);
+
+    const observer = FakeResizeObserver.instances[0]!;
+    observer.resize(element, 16, 12);
+
+    expect(canvas.context.createImageData).toHaveBeenCalledTimes(2);
+
+    controls.destroy();
+  });
+
   it("returns inert controls for empty matches and validates options before changing targets", () => {
     const missing = noiseBackground(".missing");
     expect(() => missing.destroy()).not.toThrow();

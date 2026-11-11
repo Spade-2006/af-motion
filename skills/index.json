@@ -1,0 +1,99 @@
+{
+  "$schema": "https://af-motion.dev/schemas/skills-v1.json",
+  "version": "1.0.0",
+  "name": "af-motion-skills",
+  "description": "Official AI Agent Skills and reusable instructions for AF Motion",
+  "skills": [
+    {
+      "name": "af-motion",
+      "path": "skills/af-motion/SKILL.md",
+      "category": "orchestration",
+      "description": "Master AI agent skill for AF Motion top-level capability routing and agent workflow orchestration.",
+      "triggers": ["af-motion", "animate", "motion", "animation", "visual style", "microinteraction", "3d scene"]
+    },
+    {
+      "name": "fundamentals",
+      "path": "skills/fundamentals/SKILL.md",
+      "category": "core",
+      "description": "Foundation guide for installation, imports, package subpaths, and choosing between core, React, Graphics, or 3D APIs.",
+      "triggers": ["install", "import", "package", "setup", "tree shaking", "api selection", "subpath"]
+    },
+    {
+      "name": "react-animation",
+      "path": "skills/react-animation/SKILL.md",
+      "category": "react",
+      "description": "Guide for developing React motion interfaces with hooks, components, stagger sequences, SSR hydration, and Strict Mode.",
+      "triggers": ["react", "hook", "useAnimate", "reveal", "scrollreveal", "stagger", "ssr", "hydration", "nextjs"]
+    },
+    {
+      "name": "motion-intelligence",
+      "path": "skills/motion-intelligence/SKILL.md",
+      "category": "ai-intelligence",
+      "description": "Guide for utilizing natural language interpretation, component-aware animation selection, and Motion DNA personality profiles.",
+      "triggers": ["nlp", "prompt", "motion dna", "decision engine", "recommendation", "intent", "easing recommendation"]
+    },
+    {
+      "name": "visual-styles",
+      "path": "skills/visual-styles/SKILL.md",
+      "category": "design-system",
+      "description": "Guide for applying AF Motion's 19 Visual Styles, 33 built-in palettes, and design tokens.",
+      "triggers": ["visual style", "glassmorphism", "neumorphism", "brutalist", "cyberpunk", "palette", "tokens", "theme"]
+    },
+    {
+      "name": "transitions-scroll",
+      "path": "skills/transitions-scroll/SKILL.md",
+      "category": "transitions-scroll",
+      "description": "Guide for creating entrance, exit, page transitions, and scroll-driven experiences with parallax and sticky storytelling.",
+      "triggers": ["transition", "page transition", "scroll", "parallax", "sticky scroll", "scroll progress", "scroll velocity"]
+    },
+    {
+      "name": "interactive-components",
+      "path": "skills/interactive-components/SKILL.md",
+      "category": "interactive-ui",
+      "description": "Guide for creating intelligent microinteractions, spring hover/click states, magnetic buttons, and 3D card tilt.",
+      "triggers": ["microinteraction", "button", "card", "tilt", "magnetic", "spring", "hover", "press", "interactive surface"]
+    },
+    {
+      "name": "choreography-sync",
+      "path": "skills/choreography-sync/SKILL.md",
+      "category": "choreography",
+      "description": "Guide for coordinating complex multi-element animation sequences and DOM + Graphics + 3D cross-system motion.",
+      "triggers": ["choreography", "timeline", "sequence", "parallel", "stagger", "synchronization", "cross-system"]
+    },
+    {
+      "name": "graphics-effects",
+      "path": "skills/graphics-effects/SKILL.md",
+      "category": "graphics",
+      "description": "Guide for building 2D Canvas backgrounds, particle simulations, fluid effects, frosted glass materials, and shader graphics.",
+      "triggers": ["canvas", "background", "aurora", "cosmic", "particle", "fluid", "noise", "glass material", "shader"]
+    },
+    {
+      "name": "3d-scene-development",
+      "path": "skills/3d-scene-development/SKILL.md",
+      "category": "3d",
+      "description": "Guide for building interactive 3D scenes, procedural geometry, lighting, camera controls, and 3D compositions.",
+      "triggers": ["3d", "threejs", "scene", "geometry", "camera", "lighting", "orbit", "gltf", "scene3dcanvas"]
+    },
+    {
+      "name": "motion-validation",
+      "path": "skills/motion-validation/SKILL.md",
+      "category": "diagnostics",
+      "description": "Guide for validating, auditing, and optimizing animation configurations for performance and accessibility.",
+      "triggers": ["validate", "optimize", "accessibility", "reduced motion", "wcag", "layout thrashing", "diagnostics"]
+    },
+    {
+      "name": "ai-generation",
+      "path": "skills/ai-generation/SKILL.md",
+      "category": "ai-generation",
+      "description": "Guide for utilizing AF Motion's AI generation pipeline and declarative composition schemas.",
+      "triggers": ["composition", "generation pipeline", "schema", "deterministic", "ai generation", "json schema"]
+    },
+    {
+      "name": "mcp-integration",
+      "path": "skills/mcp-integration/SKILL.md",
+      "category": "mcp",
+      "description": "Guide for integrating and interacting with AF Motion via the Model Context Protocol (MCP) server, tools, and prompts.",
+      "triggers": ["mcp", "model context protocol", "mcp server", "jsonrpc", "mcp tools", "mcp resources", "cursor", "claude"]
+    }
+  ]
+}

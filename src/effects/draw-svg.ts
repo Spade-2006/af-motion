@@ -124,6 +124,9 @@ export function drawSVG(
   let completed = 0;
 
   for (const path of paths) {
+    if (typeof path.getTotalLength !== "function") {
+      throw new TypeError("drawSVG() target paths must implement getTotalLength()");
+    }
     const length = path.getTotalLength();
     if (!Number.isFinite(length) || length < 0) {
       throw new RangeError(`SVG path length must be a finite number >= 0, received ${String(length)}`);
@@ -181,10 +184,11 @@ export function drawSVG(
   paths.forEach((path, index) => {
     const pathDelay = delay + index * stagger;
     if (!Number.isFinite(pathDelay)) throw new RangeError("delay plus stagger offsets must be finite");
-    controls.push(
-      animate(path, {
-        "stroke-dashoffset": [reverse ? 0 : path.getTotalLength(), reverse ? path.getTotalLength() : 0],
-      }, {
+      const length = Number(path.getAttribute("stroke-dasharray") ?? 0);
+      controls.push(
+        animate(path, {
+          "stroke-dashoffset": [reverse ? 0 : length, reverse ? length : 0],
+        }, {
         duration,
         delay: pathDelay,
         ...(easing === undefined ? {} : { easing }),

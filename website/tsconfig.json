@@ -1,0 +1,28 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "..",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "resolveJsonModule": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "af-motion": ["../src/index.ts"],
+      "af-motion/react": ["../src/react.ts"],
+      "af-motion/catalogue": ["../src/catalogue.ts"],
+      "af-motion/presets": ["../src/presets.ts"]
+    }
+  },
+  "include": [
+    "./src/**/*.ts",
+    "./src/**/*.tsx",
+    "../src/**/*.ts",
+    "../src/**/*.tsx",
+    "../docs/types/**/*.ts",
+    "../docs/data/**/*.ts",
+    "../docs/engine/**/*.ts",
+    "../docs/components/interactive/**/*.ts",
+    "../docs/components/interactive/**/*.tsx"
+  ],
+  "exclude": ["../node_modules", "../dist", "../tests", "./dist"]
+}

@@ -217,6 +217,8 @@ function drawRain(
 ): void {
   const { context, width, height, particles } = state;
   const angle = ((options.angle ?? 8) * Math.PI) / 180;
+  const sinAngle = Math.sin(angle);
+  const cosAngle = Math.cos(angle);
   const length = options.streakLength ?? 16;
   const fallSpeed = options.dropSpeed ?? 560;
   const intensity = options.intensity ?? DEFAULT_INTENSITY;
@@ -227,7 +229,7 @@ function drawRain(
   for (const drop of particles) {
     const velocity = fallSpeed * drop.speed;
     drop.y += velocity * elapsed;
-    drop.x += velocity * elapsed * Math.sin(angle);
+    drop.x += velocity * elapsed * sinAngle;
     if (drop.y - length > height) {
       drop.y = -Math.random() * Math.max(height, 1);
       drop.x = Math.random() * width;
@@ -238,7 +240,7 @@ function drawRain(
     context.lineWidth = 0.5 + drop.depth;
     context.beginPath();
     context.moveTo(drop.x, drop.y);
-    context.lineTo(drop.x - Math.sin(angle) * length * drop.depth, drop.y - Math.cos(angle) * length * drop.depth);
+    context.lineTo(drop.x - sinAngle * length * drop.depth, drop.y - cosAngle * length * drop.depth);
     context.stroke();
   }
   if (options.surfaceGlow) {
@@ -518,6 +520,7 @@ export function atmosphericBackground(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
   const onWindowResize = (): void => {
@@ -533,9 +536,8 @@ export function atmosphericBackground(
   const inserted: AtmosphericState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -546,10 +548,11 @@ export function atmosphericBackground(
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -570,9 +573,8 @@ export function atmosphericBackground(
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

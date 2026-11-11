@@ -172,4 +172,46 @@ describe("Reveal", () => {
     act(() => root.render(createElement(StrictMode, null, createElement(Reveal, null, "Strict"))));
     expect(FakeIntersectionObserver.instances.at(-2)?.disconnect).toHaveBeenCalledTimes(1);
   });
+
+  it("forwards external refs to the rendered div element", () => {
+    let capturedNode: HTMLDivElement | null = null;
+    const refObject = { current: null as HTMLDivElement | null };
+
+    act(() => root.render(createElement(Reveal, {
+      ref: (node: HTMLDivElement | null) => { capturedNode = node; },
+    }, "Callback Ref")));
+    mounted = true;
+
+    expect(capturedNode).toBe(host.firstElementChild);
+
+    act(() => root.render(createElement(Reveal, {
+      ref: refObject,
+    }, "Object Ref")));
+
+    expect(refObject.current).toBe(host.firstElementChild);
+  });
+
+  it("supports custom animation properties and observer thresholds", () => {
+    act(() => root.render(createElement(Reveal, {
+      properties: {
+        transform: ["scale(0.8)", "scale(1)"],
+        opacity: [0.2, 1],
+      },
+      threshold: 0.5,
+      duration: 300,
+    }, "Custom Reveal")));
+    mounted = true;
+    const element = host.firstElementChild as HTMLElement;
+
+    expect(element.style.transform).toBe("scale(0.8)");
+    expect(element.style.opacity).toBe("0.2");
+
+    act(() => observer().enter(element));
+    act(() => flushFrames(0));
+    act(() => flushFrames(150));
+    expect(element.style.opacity).toBe("0.6");
+    act(() => flushFrames(300));
+    expect(element.style.opacity).toBe("1");
+    expect(element.style.transform).toBe("scale(1)");
+  });
 });

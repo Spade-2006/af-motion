@@ -139,4 +139,20 @@ describe("inView()", () => {
     vi.stubGlobal("IntersectionObserver", undefined);
     expect(() => inView(makeElement(), vi.fn())).toThrow(/requires IntersectionObserver/);
   });
+
+  it("executes all pending cleanups even if an earlier cleanup throws during destroy", () => {
+    const first = makeElement();
+    const second = makeElement();
+    selectorResults[".multi"] = [first, second];
+    const failingCleanup = vi.fn(() => { throw new Error("cleanup exploded"); });
+    const healthyCleanup = vi.fn();
+    const controls = inView(".multi", (el) => el === first ? failingCleanup : healthyCleanup);
+
+    observer().emit(first, true);
+    observer().emit(second, true);
+
+    expect(() => controls.destroy()).toThrow("cleanup exploded");
+    expect(failingCleanup).toHaveBeenCalledTimes(1);
+    expect(healthyCleanup).toHaveBeenCalledTimes(1);
+  });
 });

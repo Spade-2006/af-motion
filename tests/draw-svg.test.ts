@@ -157,4 +157,10 @@ describe("drawSVG", () => {
 
     expect(() => drawSVG({} as SVGElement)).toThrow(TypeError);
   });
+
+  it("rejects path elements that do not implement getTotalLength", () => {
+    const invalidPath = new FakeSVGElement();
+    invalidPath.tagName = "path";
+    expect(() => drawSVG(invalidPath as unknown as SVGElement)).toThrow(/must implement getTotalLength/);
+  });
 });

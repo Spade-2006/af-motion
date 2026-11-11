@@ -258,6 +258,14 @@ describe("textMask()", () => {
     expect(textOf(second)).toBe("Two");
   });
 
+  it("applies completed clip-path immediately without RAF when duration is 0", () => {
+    const element = makeElement(new FakeText("Zero"));
+    const controls = textMask(asTarget(element), { duration: 0 });
+    expect(frames.size).toBe(0);
+    expect((element.firstChild as FakeHTMLElement).style.getPropertyValue("clip-path")).toBe("inset(0)");
+    controls.destroy();
+  });
+
   it("validates options and selectors before changing the DOM", () => {
     const element = makeElement(new FakeText("Unchanged"));
     const original = element.firstChild;

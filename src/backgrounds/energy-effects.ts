@@ -192,7 +192,7 @@ function drawLightning(
   context.shadowBlur = 18 * brightness;
   context.beginPath();
   context.moveTo(bolt[0]?.x ?? 0, bolt[0]?.y ?? 0);
-  for (const point of bolt.slice(1)) context.lineTo(point.x, point.y);
+  for (let i = 1; i < bolt.length; i++) context.lineTo(bolt[i].x, bolt[i].y);
   context.stroke();
   for (let branch = 0; branch < branchCount; branch++) {
     const start = bolt[2 + (branch * 2) % Math.max(1, bolt.length - 3)];
@@ -204,7 +204,7 @@ function drawLightning(
     const branchPoints = createBolt(context, start.x, start.y, branchEnd.x, branchEnd.y, 5, Math.min(width, height) * 0.035, branch);
     context.beginPath();
     context.moveTo(branchPoints[0]?.x ?? start.x, branchPoints[0]?.y ?? start.y);
-    for (const point of branchPoints.slice(1)) context.lineTo(point.x, point.y);
+    for (let i = 1; i < branchPoints.length; i++) context.lineTo(branchPoints[i].x, branchPoints[i].y);
     context.stroke();
   }
   context.shadowBlur = 0;
@@ -343,7 +343,7 @@ function drawElectricArcs(
     context.shadowColor = color;
     context.beginPath();
     context.moveTo(points[0]?.x ?? 0, points[0]?.y ?? 0);
-    for (const point of points.slice(1)) context.lineTo(point.x, point.y);
+    for (let i = 1; i < points.length; i++) context.lineTo(points[i].x, points[i].y);
     context.stroke();
     for (let branch = 0; branch < branchCount; branch++) {
       const start = points[2 + branch * 2];
@@ -545,6 +545,7 @@ export function energyBackground(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
   const onWindowResize = (): void => {
@@ -566,9 +567,8 @@ export function energyBackground(
   const inserted: EnergyState[] = [];
   try {
     for (const state of states) {
-      acquireBackgroundTarget(state.element);
+      acquireBackgroundTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -579,10 +579,11 @@ export function energyBackground(
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+      releaseBackgroundTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseBackgroundTarget(element);
     throw error;
   }
 
@@ -603,9 +604,8 @@ export function energyBackground(
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseBackgroundTarget(state.element);
+        releaseBackgroundTarget(state.element, state.canvas);
       }
     },
   };

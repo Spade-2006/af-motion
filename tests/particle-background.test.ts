@@ -323,9 +323,47 @@ describe("particleBackground()", () => {
     expect(element.style.getPropertyValue("isolation")).toBe("auto");
     expect(element.style.getPropertyPriority("isolation")).toBe("important");
     expect(element.listeners.get("pointermove")?.size).toBe(0);
+    expect(element.listeners.get("pointerdown")?.size).toBe(0);
     expect(element.listeners.get("pointerleave")?.size).toBe(0);
+    expect(element.listeners.get("pointercancel")?.size).toBe(0);
     expect(documentListeners.get("visibilitychange")?.size).toBe(0);
     expect(motionListeners.size).toBe(0);
+  });
+
+  it("handles pointerdown, pointercancel, and avoids redundant redraws during animation", () => {
+    const element = makeElement();
+    const controls = particleBackground(asHTMLElement(element), {
+      mode: "cursor",
+      count: 4,
+      speed: 1,
+      pointerRadius: 100,
+    });
+    const canvas = canvasOf(element);
+
+    // Initial render
+    const initialClears = canvas.context.clearRect.mock.calls.length;
+
+    // Moving pointer during animated RAF loop should NOT synchronously clear/redraw canvas
+    element.dispatch("pointermove", { clientX: 20, clientY: 20 } as PointerEvent);
+    expect(canvas.context.clearRect).toHaveBeenCalledTimes(initialClears);
+
+    // Touch tap via pointerdown updates pointer tracking
+    element.dispatch("pointerdown", { clientX: 30, clientY: 30 } as PointerEvent);
+    expect(canvas.context.clearRect).toHaveBeenCalledTimes(initialClears);
+
+    // Cancellation deactivates pointer response
+    element.dispatch("pointercancel");
+
+    // Switching to reduced motion resets active pointer state in static render
+    element.dispatch("pointermove", { clientX: 20, clientY: 20 } as PointerEvent);
+    reducedMotion = true;
+    for (const listener of motionListeners) listener({ matches: true });
+    // In static mode, stroke should not be drawn for inactive pointer
+    canvas.context.stroke.mockClear();
+    flushFrame(200);
+    expect(canvas.context.stroke).not.toHaveBeenCalled();
+
+    controls.destroy();
   });
 
   it("validates option combinations and missing palettes before changing the target", () => {

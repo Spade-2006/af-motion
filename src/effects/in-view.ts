@@ -36,6 +36,15 @@ export function inView(
     ...options,
     onEnter: (element, entry) => {
       if (destroyed) return;
+      const existing = cleanups.get(element);
+      if (existing) {
+        cleanups.delete(element);
+        try {
+          existing();
+        } catch {
+          // preserve re-entry even if previous cleanup threw
+        }
+      }
       const cleanup = callback(element, entry);
       if (typeof cleanup === "function") cleanups.set(element, cleanup);
     },
@@ -53,7 +62,15 @@ export function inView(
       trigger.destroy();
       const pendingCleanups = [...cleanups.values()];
       cleanups.clear();
-      for (const cleanup of pendingCleanups) cleanup();
+      let firstError: unknown;
+      for (const cleanup of pendingCleanups) {
+        try {
+          cleanup();
+        } catch (error) {
+          if (!firstError) firstError = error;
+        }
+      }
+      if (firstError) throw firstError;
     },
   };
 }

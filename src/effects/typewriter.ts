@@ -15,6 +15,8 @@ export interface TypewriterOptions {
   loop?: boolean;
   /** Cursor text appended while typing. Use an empty string to hide it. Defaults to "|". */
   cursor?: string;
+  /** Fires once after all phrases have finished typing when loop is false. */
+  onComplete?: () => void;
 }
 
 export interface TypewriterControls {
@@ -73,6 +75,9 @@ export function typewriter(target: AnimateTarget, options: TypewriterOptions): T
   if (typeof cursor !== "string") {
     throw new TypeError(`cursor must be a string, received ${String(cursor)}`);
   }
+  if (options.onComplete !== undefined && typeof options.onComplete !== "function") {
+    throw new TypeError("onComplete must be a function");
+  }
 
   const elements = resolveTargets(target);
   if (elements.length === 0) return { destroy: () => undefined };
@@ -130,6 +135,7 @@ export function typewriter(target: AnimateTarget, options: TypewriterOptions): T
       }
       if (!loop && phraseIndex === characters.length - 1) {
         phase = "complete";
+        options.onComplete?.();
         return;
       }
       phase = "waiting";
@@ -160,6 +166,7 @@ export function typewriter(target: AnimateTarget, options: TypewriterOptions): T
 
   if (reducedMotion) {
     showFinalPhrase();
+    options.onComplete?.();
     return {
       destroy: () => {
         if (destroyed) return;
@@ -177,6 +184,7 @@ export function typewriter(target: AnimateTarget, options: TypewriterOptions): T
     clearTimer();
     showFinalPhrase();
     stopPreferenceListener();
+    options.onComplete?.();
   });
 
   return {

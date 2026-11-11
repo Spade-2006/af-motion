@@ -149,14 +149,18 @@ export function waveBackground(
 
       const element = elements[index];
       if (!element) continue;
-      acquireTarget(element);
+      acquireTarget(element, svg);
       acquired.push(element);
-      element.insertBefore(svg, element.firstChild);
       svgs.push(svg);
     }
   } catch (error) {
-    for (const svg of svgs) svg.parentElement?.removeChild(svg);
-    for (const element of acquired) releaseTarget(element);
+    for (let index = 0; index < svgs.length; index++) {
+      const svg = svgs[index];
+      const element = acquired[index];
+      if (element && svg) releaseTarget(element, svg);
+      else if (element) releaseTarget(element);
+      else if (svg?.parentElement) svg.parentElement.removeChild(svg);
+    }
     stylesheet.parentElement?.removeChild(stylesheet);
     throw error;
   }
@@ -186,8 +190,7 @@ export function waveBackground(
         const svg = svgs[index];
         const element = elements[index];
         if (!svg || !element) continue;
-        if (svg.parentElement === element) element.removeChild(svg);
-        releaseTarget(element);
+        releaseTarget(element, svg);
       }
       stylesheet.parentElement?.removeChild(stylesheet);
     },

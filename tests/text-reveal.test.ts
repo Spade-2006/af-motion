@@ -272,6 +272,17 @@ describe("textReveal()", () => {
     expect(textOf(second)).toBe("Two");
   });
 
+  it("reveals elements immediately without RAF when duration is 0", () => {
+    const element = makeElement("Quick");
+    const controls = textReveal(asTarget(element), { duration: 0 });
+    expect(frames.size).toBe(0);
+    const units = unitsOf(element);
+    expect(units.length).toBeGreaterThan(0);
+    expect(units.every((u) => u.style.getPropertyValue("opacity") === "1")).toBe(true);
+    expect(units.every((u) => u.style.getPropertyValue("transform") === "none")).toBe(true);
+    controls.destroy();
+  });
+
   it("validates values before changing the target and exposes the public types", () => {
     const element = makeElement("Still intact");
     const original = element.firstChild;

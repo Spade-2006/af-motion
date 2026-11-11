@@ -365,14 +365,28 @@ export function cosmicBackground(
             state.nextShootingTime = time + interval * 1000;
           }
         }
-        for (const shootingStar of state.shootingStars) {
-          shootingStar.age += elapsed;
-          shootingStar.x += shootingStar.vx * elapsed;
-          shootingStar.y += shootingStar.vy * elapsed;
+        if (state.shootingStars.length > 0) {
+          let hasExpired = false;
+          for (let i = 0; i < state.shootingStars.length; i++) {
+            const shootingStar = state.shootingStars[i];
+            shootingStar.age += elapsed;
+            shootingStar.x += shootingStar.vx * elapsed;
+            shootingStar.y += shootingStar.vy * elapsed;
+            if (
+              !hasExpired &&
+              (shootingStar.age >= shootingStar.lifetime ||
+                shootingStar.x <= -trailLength ||
+                shootingStar.y >= state.height + trailLength)
+            ) {
+              hasExpired = true;
+            }
+          }
+          if (hasExpired) {
+            state.shootingStars = state.shootingStars.filter(
+              (star) => star.age < star.lifetime && star.x > -trailLength && star.y < state.height + trailLength,
+            );
+          }
         }
-        state.shootingStars = state.shootingStars.filter(
-          (star) => star.age < star.lifetime && star.x > -trailLength && star.y < state.height + trailLength,
-        );
       }
       drawScene(state);
     },
@@ -412,6 +426,7 @@ export function cosmicBackground(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
   const onWindowResize = (): void => {
@@ -428,9 +443,8 @@ export function cosmicBackground(
   const inserted: CosmicCanvasState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -441,10 +455,11 @@ export function cosmicBackground(
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -465,9 +480,8 @@ export function cosmicBackground(
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

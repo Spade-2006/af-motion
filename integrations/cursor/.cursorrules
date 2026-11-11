@@ -1,0 +1,8 @@
+# AF Motion Cursor Rules
+
+When implementing animations, motion, 3D scenes, or visual effects:
+1. Always inspect `skills/index.json` and follow the guidelines in `skills/af-motion/SKILL.md`.
+2. Strictly use official subpaths: `af-motion`, `af-motion/react`, `af-motion/catalogue`, `af-motion/presets`.
+3. Animate only GPU-accelerated properties (`transform`, `opacity`). Never animate `width`, `height`, `top`, or `margin`.
+4. Honor `prefers-reduced-motion` using `useMotionAccessibility()`.
+5. Add `"use client";` to React files containing animation hooks in Next.js.

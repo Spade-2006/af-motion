@@ -12,6 +12,7 @@ interface TargetRecord {
   isolation: InlineStyleValue;
   restorePosition: boolean;
   restoreIsolation: boolean;
+  backgroundElements: (HTMLElement | SVGElement)[];
 }
 
 export interface CanvasBackgroundState {
@@ -56,10 +57,19 @@ export function subscribeToActiveBackgroundPalette(
   onColors: (colors: readonly string[]) => void,
 ): () => void {
   if (name !== "active") return () => undefined;
+  let lastColors = resolveBackgroundColors(name, fallback);
   return subscribeToPaletteChanges((palette) => {
-    onColors(palette
+    const nextColors = palette
       ? [palette.tokens.primary, palette.tokens.secondary, palette.tokens.accent]
-      : fallback);
+      : fallback;
+    if (
+      nextColors.length === lastColors.length &&
+      nextColors.every((color, index) => color === lastColors[index])
+    ) {
+      return;
+    }
+    lastColors = nextColors;
+    onColors(nextColors);
   });
 }
 
@@ -82,11 +92,25 @@ export function resizeCanvasToElement(
   width: number,
   height: number,
 ): void {
-  state.width = Math.max(0, width);
-  state.height = Math.max(0, height);
+  const nextWidth = Math.max(0, width);
+  const nextHeight = Math.max(0, height);
   const dpr = typeof devicePixelRatio === "number" ? Math.max(1, Math.min(devicePixelRatio, 2)) : 1;
-  state.canvas.width = Math.round(state.width * dpr);
-  state.canvas.height = Math.round(state.height * dpr);
+  const pixelWidth = Math.round(nextWidth * dpr);
+  const pixelHeight = Math.round(nextHeight * dpr);
+
+  if (
+    state.width === nextWidth &&
+    state.height === nextHeight &&
+    state.canvas.width === pixelWidth &&
+    state.canvas.height === pixelHeight
+  ) {
+    return;
+  }
+
+  state.width = nextWidth;
+  state.height = nextHeight;
+  state.canvas.width = pixelWidth;
+  state.canvas.height = pixelHeight;
   state.context.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 
@@ -107,23 +131,121 @@ function restoreInlineStyle(element: HTMLElement, property: string, value: Inlin
   else element.style.setProperty(property, value.value, value.priority);
 }
 
-export function acquireBackgroundTarget(element: HTMLElement): void {
-  const existing = targetRecords.get(element);
-  if (existing) {
-    existing.count++;
-    return;
+function getNextSibling(container: HTMLElement, node: HTMLElement | SVGElement): Node | null {
+  if ("nextSibling" in node && (node as unknown as { nextSibling?: Node | null }).nextSibling !== undefined) {
+    return (node as unknown as { nextSibling: Node | null }).nextSibling;
   }
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
+  const children = (container as unknown as { children?: (HTMLElement | SVGElement)[] }).children;
+  if (Array.isArray(children)) {
+    const index = children.indexOf(node);
+    if (index >= 0 && index + 1 < children.length) {
+      return children[index + 1] as unknown as Node;
+    }
+  }
+  return null;
 }
 
-export function releaseBackgroundTarget(element: HTMLElement): void {
+export function insertBackgroundElement(
+  container: HTMLElement,
+  child: HTMLElement | SVGElement,
+): void {
+  let record = targetRecords.get(container);
+  if (!record) {
+    acquireBackgroundTarget(container);
+    record = targetRecords.get(container);
+  }
+
+  const elements = record?.backgroundElements;
+  if (child.parentElement === container) {
+    if (elements && !elements.includes(child)) {
+      elements.push(child);
+    }
+    return;
+  }
+
+  let lastBackground: HTMLElement | SVGElement | null = null;
+  if (elements && elements.length > 0) {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el && el.parentElement === container) {
+        lastBackground = el;
+        break;
+      }
+    }
+  }
+
+  if (lastBackground) {
+    const next = getNextSibling(container, lastBackground);
+    container.insertBefore(child, next);
+  } else {
+    container.insertBefore(child, container.firstChild);
+  }
+
+  if (elements && !elements.includes(child)) {
+    elements.push(child);
+  }
+}
+
+export function removeBackgroundElement(
+  container: HTMLElement,
+  child: HTMLElement | SVGElement,
+): void {
+  const record = targetRecords.get(container);
+  if (record) {
+    const idx = record.backgroundElements.indexOf(child);
+    if (idx >= 0) {
+      record.backgroundElements.splice(idx, 1);
+    }
+  }
+  if (child.parentElement === container) {
+    container.removeChild(child);
+  }
+}
+
+export function acquireBackgroundTarget(
+  element: HTMLElement,
+  backgroundElement?: HTMLElement | SVGElement,
+): void {
+  let record = targetRecords.get(element);
+  if (record) {
+    record.count++;
+  } else {
+    const position = readInlineStyle(element, "position");
+    const isolation = readInlineStyle(element, "isolation");
+    const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
+    const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
+    const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
+    if (restorePosition) element.style.setProperty("position", "relative");
+    if (restoreIsolation) element.style.setProperty("isolation", "isolate");
+    record = {
+      count: 1,
+      position,
+      isolation,
+      restorePosition,
+      restoreIsolation,
+      backgroundElements: [],
+    };
+    targetRecords.set(element, record);
+  }
+
+  if (backgroundElement) {
+    try {
+      insertBackgroundElement(element, backgroundElement);
+    } catch (error) {
+      releaseBackgroundTarget(element);
+      throw error;
+    }
+  }
+}
+
+export function releaseBackgroundTarget(
+  element: HTMLElement,
+  backgroundElement?: HTMLElement | SVGElement,
+): void {
+  if (backgroundElement) {
+    removeBackgroundElement(element, backgroundElement);
+  }
+
   const record = targetRecords.get(element);
   if (!record) return;
   record.count--;
@@ -180,6 +302,7 @@ export function createMotionFrameScheduler<T>(
     frameId = requestAnimationFrame(tick);
   };
   const onVisibilityChange = (): void => {
+    if (destroyed) return;
     documentVisible = !document.hidden;
     if (!documentVisible) stopFrame();
     else {

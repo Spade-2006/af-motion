@@ -1,0 +1,9 @@
+{
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "editor.formatOnSave": true,
+  "files.eol": "\r\n",
+  "files.associations": {
+    "*.mdc": "markdown"
+  }
+}

@@ -1,6 +1,7 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import { acquireEffectTarget, releaseEffectTarget } from "../core/transform.js";
 
 export type ShineTrigger = "hover" | "continuous" | "click";
 
@@ -22,19 +23,6 @@ export interface ShineControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface ShineState {
   target: HTMLElement;
   overlay: HTMLDivElement;
@@ -49,47 +37,8 @@ const DEFAULT_ANGLE = 120;
 const DEFAULT_DURATION = 1200;
 const DEFAULT_INTENSITY = 0.7;
 const DEFAULT_TRIGGER: ShineTrigger = "hover";
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  const current = targetRecords.get(element);
-  if (current) {
-    current.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
+const acquireTarget = acquireEffectTarget;
+const releaseTarget = releaseEffectTarget;
 
 function validateColor(color: string): void {
   if (typeof color !== "string" || color.trim() === "") {
@@ -235,6 +184,7 @@ export function shine(target: AnimateTarget, options: ShineOptions = {}): ShineC
       if (trigger === "hover") {
         element.addEventListener("pointerenter", state.onPointerEnter);
         element.addEventListener("pointerleave", state.onPointerLeave);
+        element.addEventListener("pointercancel", state.onPointerLeave);
       } else if (trigger === "click") {
         element.addEventListener("click", state.onClick);
       }
@@ -245,6 +195,7 @@ export function shine(target: AnimateTarget, options: ShineOptions = {}): ShineC
       cancelSweep(state);
       state.target.removeEventListener("pointerenter", state.onPointerEnter);
       state.target.removeEventListener("pointerleave", state.onPointerLeave);
+      state.target.removeEventListener("pointercancel", state.onPointerLeave);
       state.target.removeEventListener("click", state.onClick);
       if (state.overlay.parentElement === state.target) state.target.removeChild(state.overlay);
     }
@@ -280,6 +231,7 @@ export function shine(target: AnimateTarget, options: ShineOptions = {}): ShineC
         cancelSweep(state);
         state.target.removeEventListener("pointerenter", state.onPointerEnter);
         state.target.removeEventListener("pointerleave", state.onPointerLeave);
+        state.target.removeEventListener("pointercancel", state.onPointerLeave);
         state.target.removeEventListener("click", state.onClick);
         if (state.overlay.parentElement === state.target) state.target.removeChild(state.overlay);
         releaseTarget(state.target);

@@ -156,6 +156,7 @@ export function glow(target: AnimateTarget, options: GlowOptions = {}): GlowCont
     stopPulse(state);
     state.element.removeEventListener("pointerenter", state.onPointerEnter);
     state.element.removeEventListener("pointerleave", state.onPointerLeave);
+    state.element.removeEventListener("pointercancel", state.onPointerLeave);
     if (state.originalShadow === "") state.element.style.removeProperty("box-shadow");
     else state.element.style.setProperty("box-shadow", state.originalShadow, state.originalShadowPriority);
     if (state.originalTransition === "") state.element.style.removeProperty("transition");
@@ -185,6 +186,7 @@ export function glow(target: AnimateTarget, options: GlowOptions = {}): GlowCont
         };
         state.element.addEventListener("pointerenter", state.onPointerEnter);
         state.element.addEventListener("pointerleave", state.onPointerLeave);
+        state.element.addEventListener("pointercancel", state.onPointerLeave);
       }
       applyState(state);
     }

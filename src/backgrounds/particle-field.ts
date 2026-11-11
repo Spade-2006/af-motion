@@ -115,14 +115,20 @@ function draw(state: CanvasState, size: number, connections: boolean): void {
   const { context, particles, width, height } = state;
   context.clearRect(0, 0, width, height);
 
+  let lastFillColor: string | null = null;
   for (const particle of particles) {
     context.beginPath();
     context.arc(particle.x * width, particle.y * height, size, 0, Math.PI * 2);
-    context.fillStyle = particle.color;
+    if (particle.color !== lastFillColor) {
+      context.fillStyle = particle.color;
+      lastFillColor = particle.color;
+    }
     context.fill();
   }
 
   if (!connections) return;
+  context.lineWidth = 1;
+  let lastStrokeColor: string | null = null;
   for (let first = 0; first < particles.length; first++) {
     const a = particles[first];
     if (!a) continue;
@@ -136,9 +142,11 @@ function draw(state: CanvasState, size: number, connections: boolean): void {
       context.beginPath();
       context.moveTo(a.x * width, a.y * height);
       context.lineTo(b.x * width, b.y * height);
-      context.strokeStyle = a.color;
+      if (a.color !== lastStrokeColor) {
+        context.strokeStyle = a.color;
+        lastStrokeColor = a.color;
+      }
       context.globalAlpha = 1 - distance / CONNECTION_DISTANCE_PX;
-      context.lineWidth = 1;
       context.stroke();
     }
   }
@@ -234,6 +242,7 @@ export function particleField(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
 
@@ -251,9 +260,8 @@ export function particleField(
   const inserted: CanvasState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -263,11 +271,12 @@ export function particleField(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      state.element.removeChild(state.canvas);
       releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -280,9 +289,8 @@ export function particleField(
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

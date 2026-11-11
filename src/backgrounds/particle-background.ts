@@ -125,6 +125,8 @@ function connectNearby(
 ): void {
   if (distanceLimit <= 0) return;
   const { context, particles, width, height } = state;
+  context.lineWidth = 1;
+  let lastStrokeColor: string | null = null;
   const cells = new Map<string, number[]>();
   const cellKey = (x: number, y: number): string => `${x},${y}`;
   for (let index = 0; index < particles.length; index++) {
@@ -160,9 +162,12 @@ function connectNearby(
           context.beginPath();
           context.moveTo(x, y);
           context.lineTo(other.x * width, other.y * height);
-          context.strokeStyle = colors[particle.colorIndex] ?? colors[0] ?? "#000";
+          const strokeColor = colors[particle.colorIndex] ?? colors[0] ?? "#000";
+          if (strokeColor !== lastStrokeColor) {
+            context.strokeStyle = strokeColor;
+            lastStrokeColor = strokeColor;
+          }
           context.globalAlpha = (1 - distance / distanceLimit) * 0.45;
-          context.lineWidth = 1;
           context.stroke();
         }
       }
@@ -187,12 +192,17 @@ function draw(
     connectNearby(state, colors, connectionDistance);
   }
   context.globalAlpha = opacity;
+  let lastFillColor: string | null = null;
   for (const particle of particles) {
     const x = particle.x * width;
     const y = particle.y * height;
     context.beginPath();
     context.arc(x, y, size, 0, Math.PI * 2);
-    context.fillStyle = colors[particle.colorIndex] ?? colors[0] ?? "#000";
+    const fillColor = colors[particle.colorIndex] ?? colors[0] ?? "#000";
+    if (fillColor !== lastFillColor) {
+      context.fillStyle = fillColor;
+      lastFillColor = fillColor;
+    }
     context.fill();
     if (pointerInteraction && state.pointerActive) {
       const dx = x - state.pointerX;
@@ -309,11 +319,17 @@ export function particleBackground(
   const render = (state: CanvasState): void => {
     draw(state, mode, currentColors, size, opacity, connectionDistance, pointerRadius, pointerInteraction);
   };
+  const animated = speed > 0;
   const scheduler = createMotionFrameScheduler<CanvasState>({
     speed: 1,
-    animated: speed > 0,
+    animated,
     errorName: "particleBackground()",
-    renderStatic: () => states.forEach(render),
+    renderStatic: () => {
+      for (const state of states) {
+        state.pointerActive = false;
+        render(state);
+      }
+    },
     update: (state, elapsed) => {
       if (speed > 0) {
         const modeSpeed = mode === "constellation" ? 0.12 : 1;
@@ -373,6 +389,7 @@ export function particleBackground(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
   const onWindowResize = (): void => {
@@ -395,14 +412,17 @@ export function particleBackground(
         state.pointerX = pointerEvent.clientX - rect.left;
         state.pointerY = pointerEvent.clientY - rect.top;
         state.pointerActive = true;
-        render(state);
+        if (!animated) render(state);
       };
       const onPointerLeave: EventListener = () => {
+        if (!state.pointerActive) return;
         state.pointerActive = false;
-        render(state);
+        if (!animated) render(state);
       };
       state.element.addEventListener("pointermove", onPointerMove);
+      state.element.addEventListener("pointerdown", onPointerMove);
       state.element.addEventListener("pointerleave", onPointerLeave);
+      state.element.addEventListener("pointercancel", onPointerLeave);
       pointerHandlers.set(state.element, { move: onPointerMove, leave: onPointerLeave });
     }
   }
@@ -411,9 +431,8 @@ export function particleBackground(
   const inserted: CanvasState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -426,12 +445,15 @@ export function particleBackground(
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
     for (const [element, handlers] of pointerHandlers) {
       element.removeEventListener("pointermove", handlers.move);
+      element.removeEventListener("pointerdown", handlers.move);
       element.removeEventListener("pointerleave", handlers.leave);
+      element.removeEventListener("pointercancel", handlers.leave);
     }
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
   const stopPaletteListener = subscribeToActiveBackgroundPalette(palette, configuredColors, (colors) => {
@@ -454,11 +476,12 @@ export function particleBackground(
         const handlers = pointerHandlers.get(state.element);
         if (handlers) {
           state.element.removeEventListener("pointermove", handlers.move);
+          state.element.removeEventListener("pointerdown", handlers.move);
           state.element.removeEventListener("pointerleave", handlers.leave);
+          state.element.removeEventListener("pointercancel", handlers.leave);
         }
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

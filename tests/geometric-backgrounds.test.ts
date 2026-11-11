@@ -55,7 +55,8 @@ class FakeContext {
   moveTo = vi.fn();
   lineTo = vi.fn();
   closePath = vi.fn();
-  stroke = vi.fn();
+  strokeAlphas: number[] = [];
+  stroke = vi.fn(() => { this.strokeAlphas.push(this.globalAlpha); });
   arc = vi.fn();
   fill = vi.fn();
   fillRect = vi.fn();
@@ -288,6 +289,21 @@ describe("geometricBackground()", () => {
     expect(documentListeners.get("visibilitychange")?.size).toBe(0);
     expect(motionListeners.size).toBe(0);
     expect(frames.size).toBe(0);
+  });
+
+  it("controls visual strength through intensity and rejects invalid intensity values", () => {
+    const element = makeElement();
+    const target = asHTMLElement(element);
+    const controls = geometricBackground(target, { effect: "grid", intensity: 0.5, speed: 0 });
+    const canvas = canvasOf(element);
+    expect(canvas.context.strokeAlphas[0]).toBeCloseTo(0.175);
+    controls.destroy();
+
+    expect(() => geometricBackground(target, { intensity: -0.1 })).toThrow(RangeError);
+    expect(() => geometricBackground(target, { intensity: 1.1 })).toThrow(RangeError);
+    expect(() => geometricBackground(target, { speed: -1 })).toThrow(RangeError);
+    expect(element.children).toHaveLength(0);
+    expect(element.style.getPropertyValue("position")).toBe("");
   });
 
   it("rejects invalid options and unknown palettes before changing the target", () => {

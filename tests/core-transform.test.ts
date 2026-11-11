@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { removeTransformLayer, setTransformLayer } from "../src/core/transform";
+import { acquireEffectTarget, releaseEffectTarget, removeTransformLayer, setTransformLayer } from "../src/core/transform";
 
 class FakeStyle {
   private values = new Map<string, string>();
@@ -7,6 +7,10 @@ class FakeStyle {
 
   get transform(): string {
     return this.values.get("transform") ?? "";
+  }
+
+  getPropertyValue(name: string): string {
+    return this.values.get(name) ?? "";
   }
 
   getPropertyPriority(name: string): string {
@@ -74,16 +78,43 @@ describe("transform layers", () => {
     expect(transformOf(element)).toBeUndefined();
   });
 
-  it("restores the original transform priority after the final layer is removed", () => {
+  it("preserves original transform priority while layers are active and after removal", () => {
     const element = new FakeHTMLElement();
     element.style.setProperty("transform", "rotate(10deg)", "important");
     const owner = {};
     const target = element as unknown as HTMLElement;
 
     setTransformLayer(target, owner, "translateY(8px)");
-    removeTransformLayer(target, owner);
+    expect(transformOf(element)).toBe("rotate(10deg) translateY(8px)");
+    expect(element.style.getPropertyPriority("transform")).toBe("important");
 
+    removeTransformLayer(target, owner);
     expect(transformOf(element)).toBe("rotate(10deg)");
     expect(element.style.getPropertyPriority("transform")).toBe("important");
+  });
+
+  describe("shared effect target acquisition", () => {
+    it("maintains container position and isolation while any effect remains active", () => {
+      const element = new FakeHTMLElement();
+      const target = element as unknown as HTMLElement;
+
+      acquireEffectTarget(target);
+      expect(element.style.getPropertyValue("position")).toBe("relative");
+      expect(element.style.getPropertyValue("isolation")).toBe("isolate");
+
+      // Second effect acquires same container
+      acquireEffectTarget(target);
+      expect(element.style.getPropertyValue("position")).toBe("relative");
+
+      // First effect is released - container must stay relative and isolated
+      releaseEffectTarget(target);
+      expect(element.style.getPropertyValue("position")).toBe("relative");
+      expect(element.style.getPropertyValue("isolation")).toBe("isolate");
+
+      // Final effect is released - container styles restored cleanly
+      releaseEffectTarget(target);
+      expect(element.style.getPropertyValue("position")).toBe("");
+      expect(element.style.getPropertyValue("isolation")).toBe("");
+    });
   });
 });

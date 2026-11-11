@@ -1,6 +1,7 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import { acquireEffectTarget, releaseEffectTarget } from "../core/transform.js";
 
 export interface SpotlightOptions {
   /** CSS color for the radial light. Defaults to translucent white. */
@@ -18,19 +19,6 @@ export interface SpotlightControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface SpotlightState {
   element: HTMLElement;
   overlay: HTMLDivElement;
@@ -43,47 +31,8 @@ const DEFAULT_COLOR = "rgba(255, 255, 255, 0.18)";
 const DEFAULT_RADIUS = 180;
 const DEFAULT_INTENSITY = 0.6;
 const DEFAULT_SMOOTHING = 0.12;
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (record) {
-    record.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
+const acquireTarget = acquireEffectTarget;
+const releaseTarget = releaseEffectTarget;
 
 function validateColor(color: string): void {
   if (typeof color !== "string" || color.trim() === "") {
@@ -112,9 +61,11 @@ function setListening(state: SpotlightState, enabled: boolean): void {
   if (enabled) {
     state.element.addEventListener("pointermove", state.onPointerMove);
     state.element.addEventListener("pointerleave", state.onPointerLeave);
+    state.element.addEventListener("pointercancel", state.onPointerLeave);
   } else {
     state.element.removeEventListener("pointermove", state.onPointerMove);
     state.element.removeEventListener("pointerleave", state.onPointerLeave);
+    state.element.removeEventListener("pointercancel", state.onPointerLeave);
     setPosition(state, "50%", "50%");
   }
 }

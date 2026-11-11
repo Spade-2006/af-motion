@@ -1,4 +1,5 @@
 import { applyMotionDNA } from "./motion-dna.js";
+import { adaptAnimationOptions, type AdaptiveMotionConditions } from "./adaptive-motion.js";
 import type { MotionDNA, MotionDNAOverrides } from "./motion-dna.js";
 
 export type EffectCompositionInstance =
@@ -19,9 +20,14 @@ export interface MotionDNACompositionEntry {
     name: string;
     overrides?: MotionDNAOverrides;
   };
+  adaptive?: boolean | AdaptiveMotionConditions;
 }
 
-export type ComposableEffect = EffectCompositionEntry | MotionDNACompositionEntry;
+export type ComposableEffect =
+  | EffectCompositionEntry
+  | MotionDNACompositionEntry
+  | (() => EffectCompositionInstance)
+  | EffectCompositionInstance;
 
 export interface EffectCompositionControls {
   /** Cleans up every effect in reverse start order. Safe to call repeatedly. */
@@ -32,6 +38,8 @@ export interface EffectCompositionControls {
   pause(): void;
   /** Resumes effects that expose a resume control. */
   resume(): void;
+  /** Composed effect instances in start order. */
+  readonly effects: readonly EffectCompositionInstance[];
 }
 
 function isCompositionInstance(value: unknown): value is EffectCompositionInstance {
@@ -78,7 +86,7 @@ export function composeEffects(entries: readonly ComposableEffect[]): EffectComp
     if (destroyed) return;
     destroyed = true;
     const errors: unknown[] = [];
-    for (const instance of started.reverse()) {
+    for (const instance of [...started].reverse()) {
       try {
         dispose(instance);
       } catch (error) {
@@ -91,24 +99,55 @@ export function composeEffects(entries: readonly ComposableEffect[]): EffectComp
     }
   };
 
+  const createdInstances: EffectCompositionInstance[] = [];
+
   try {
     for (const [index, entry] of entries.entries()) {
-      if (entry === null || typeof entry !== "object" || typeof entry.start !== "function") {
-        throw new TypeError(`Effect composition entry ${index} must provide a start function`);
+      if (entry === null || (typeof entry !== "object" && typeof entry !== "function")) {
+        throw new TypeError(`Effect composition entry ${index} must provide a start function or controls`);
       }
-      const instance = "motionDNA" in entry && entry.motionDNA !== undefined
-        ? entry.start(applyMotionDNA(entry.motionDNA.name, entry.motionDNA.overrides))
-        : entry.start();
+      let instance: EffectCompositionInstance;
+      let created = false;
+      if (typeof entry === "function") {
+        instance = (entry as () => EffectCompositionInstance)();
+        created = true;
+      } else if ("start" in entry && typeof entry.start === "function") {
+        if ("motionDNA" in entry && entry.motionDNA !== undefined) {
+          const rawDNA = applyMotionDNA(entry.motionDNA.name, entry.motionDNA.overrides);
+          const adapted = (entry as any).adaptive
+            ? adaptAnimationOptions(rawDNA, typeof (entry as any).adaptive === "object" ? (entry as any).adaptive : undefined)
+            : rawDNA;
+          instance = entry.start(adapted);
+        } else {
+          instance = entry.start();
+        }
+        created = true;
+      } else if (isCompositionInstance(entry)) {
+        instance = entry;
+      } else {
+        throw new TypeError(`Effect composition entry ${index} must provide a start function or controls`);
+      }
       if (!isCompositionInstance(instance)) {
         throw new TypeError(`Effect composition entry ${index} must return destroy() or cancel() controls`);
+      }
+      if (created) {
+        createdInstances.push(instance);
       }
       started.push(instance);
     }
   } catch (error) {
-    try {
-      destroy();
-    } catch (cleanupError) {
-      throw new AggregateError([error, cleanupError], "Effect composition failed to start and clean up");
+    const cleanupErrors: unknown[] = [];
+    for (const instance of [...createdInstances].reverse()) {
+      try {
+        dispose(instance);
+      } catch (cleanupError) {
+        cleanupErrors.push(cleanupError);
+      }
+    }
+    started.length = 0;
+    createdInstances.length = 0;
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError([error, ...cleanupErrors], "Effect composition failed to start and clean up");
     }
     throw error;
   }
@@ -118,5 +157,8 @@ export function composeEffects(entries: readonly ComposableEffect[]): EffectComp
     cancel: destroy,
     pause: () => control("pause"),
     resume: () => control("resume"),
+    get effects() {
+      return [...started];
+    },
   };
 }

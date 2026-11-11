@@ -573,6 +573,7 @@ describe("tilt: invalid input", () => {
   it.each([-1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid maxTilt/speed (%s)", (value) => {
     expect(() => tilt(element(), { maxTilt: value })).toThrow(RangeError);
     expect(() => tilt(element(), { speed: value })).toThrow(RangeError);
+    expect(() => tilt(element(), { duration: value })).toThrow(RangeError);
   });
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -590,6 +591,12 @@ describe("tilt: invalid input", () => {
   it("rejects invalid selectors and targets", () => {
     expect(() => tilt("!!bad")).toThrow(SyntaxError);
     expect(() => tilt({} as unknown as HTMLElement)).toThrow(TypeError);
+  });
+
+  it("supports duration as a backward-compatible alias for speed", () => {
+    const el = element();
+    const controls = tilt(el, { duration: 150 });
+    expect(() => controls.destroy()).not.toThrow();
   });
 
   it("validates options even when nothing matches", () => {

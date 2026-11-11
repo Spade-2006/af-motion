@@ -243,6 +243,10 @@ describe("drag()", () => {
     expect(() => drag(target(new FakeHTMLElement()), { container: 5 as never })).toThrow(/container/);
   });
 
+  it("validates followPointer container option even when target selector matches nothing", () => {
+    expect(() => followPointer(".missing-target", { container: ".missing-container" })).toThrow(RangeError);
+  });
+
   it("does not resume or move after cancellation", () => {
     const element = new FakeHTMLElement();
     const controls = drag(target(element));

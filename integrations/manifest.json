@@ -1,0 +1,115 @@
+{
+  "$schema": "https://af-motion.dev/schemas/agent-integrations-v1.json",
+  "name": "af-motion-agent-integrations",
+  "version": "1.0.0",
+  "description": "Official agent integrations for AF Motion across Google Antigravity, VS Code, OpenAI Codex, Claude Code, and Cursor",
+  "skills": {
+    "root": "skills/",
+    "index": "skills/index.json",
+    "primary": "skills/af-motion/SKILL.md",
+    "totalSkills": 13
+  },
+  "mcp": {
+    "serverEntry": "bin/mcp-server.js",
+    "protocolVersion": "2024-11-05",
+    "transports": [
+      "stdio",
+      "in-memory"
+    ],
+    "toolsCount": 20,
+    "resourcesCount": 6,
+    "promptsCount": 6
+  },
+  "agents": {
+    "antigravity": {
+      "name": "Google Antigravity",
+      "status": "supported",
+      "verificationStatus": "verified-structural",
+      "skillEntry": "skills/af-motion/SKILL.md",
+      "skillDiscovery": "native-skills",
+      "instructionFiles": [
+        "integrations/antigravity/GEMINI.md",
+        "integrations/antigravity/workflow.md",
+        "GEMINI.md"
+      ],
+      "mcpConfig": "integrations/antigravity/mcp_config.json",
+      "mcpConfigWorkspace": "mcp_config.json",
+      "documentation": "integrations/antigravity/README.md",
+      "installationMethod": "workspace-rule-and-mcp",
+      "compatibilityNotes": "Native Antigravity progressive skill discovery and workspace rule loading."
+    },
+    "vscode": {
+      "name": "Visual Studio Code",
+      "status": "supported",
+      "verificationStatus": "verified-structural",
+      "skillEntry": "skills/af-motion/SKILL.md",
+      "skillDiscovery": "copilot-instructions-and-mcp",
+      "instructionFiles": [
+        "integrations/vscode/copilot-instructions.md",
+        ".github/copilot-instructions.md"
+      ],
+      "workspaceConfig": [
+        "integrations/vscode/settings.json",
+        "integrations/vscode/extensions.json",
+        "integrations/vscode/tasks.json",
+        ".vscode/settings.json",
+        ".vscode/extensions.json",
+        ".vscode/tasks.json"
+      ],
+      "mcpConfig": "integrations/vscode/mcp.json",
+      "mcpConfigWorkspace": ".vscode/mcp.json",
+      "documentation": "integrations/vscode/README.md",
+      "installationMethod": "workspace-settings-and-extension-mcp",
+      "compatibilityNotes": "Supports native VS Code tasks, workspace TypeScript SDK, GitHub Copilot Chat, Continue, and Cline."
+    },
+    "codex": {
+      "name": "OpenAI Codex",
+      "status": "supported",
+      "verificationStatus": "verified-structural",
+      "skillEntry": "skills/af-motion/SKILL.md",
+      "skillDiscovery": "directory",
+      "instructionFiles": [
+        "integrations/codex/AGENTS.md",
+        "AGENTS.md"
+      ],
+      "configPath": "integrations/codex/config.json",
+      "mcpConfig": "integrations/codex/config.json",
+      "documentation": "integrations/codex/README.md",
+      "installationMethod": "agents-instructions-and-tool-config",
+      "compatibilityNotes": "Consumes AGENTS.md instructions and exposes stdio MCP server for Codex tool calls."
+    },
+    "claude-code": {
+      "name": "Claude Code & Claude Desktop",
+      "status": "supported",
+      "verificationStatus": "verified-structural",
+      "skillEntry": "skills/af-motion/SKILL.md",
+      "skillDiscovery": "file-reference",
+      "instructionFiles": [
+        "integrations/claude-code/CLAUDE.md",
+        "CLAUDE.md"
+      ],
+      "mcpConfig": "integrations/claude-code/claude-desktop-config.json",
+      "documentation": "integrations/claude-code/README.md",
+      "installationMethod": "claude-mcp-add",
+      "compatibilityNotes": "Native CLAUDE.md project rules and stdio MCP server for Claude Code CLI and Desktop."
+    },
+    "cursor": {
+      "name": "Cursor IDE",
+      "status": "supported",
+      "verificationStatus": "verified-structural",
+      "skillEntry": "skills/af-motion/SKILL.md",
+      "skillDiscovery": "rule-reference",
+      "instructionFiles": [
+        "integrations/cursor/.cursorrules",
+        "integrations/cursor/rules/af-motion.mdc",
+        ".cursorrules",
+        ".cursor/rules/af-motion.mdc"
+      ],
+      "mcpConfig": "integrations/cursor/mcp.json",
+      "mcpConfigWorkspace": ".cursor/mcp.json",
+      "documentation": "integrations/cursor/README.md",
+      "installationMethod": "cursorrules-and-cursor-mcp",
+      "compatibilityNotes": "Supports Cursor MDC rules, legacy .cursorrules, and workspace .cursor/mcp.json."
+    }
+  }
+}

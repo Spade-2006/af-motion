@@ -132,4 +132,82 @@ describe("useScrollProgress", () => {
 
     expect(document.body.querySelectorAll('[aria-hidden="true"]')).toHaveLength(1);
   });
+
+  it("does not recreate progress tracking or reset progress when onUpdate changes on re-render", () => {
+    const calls: number[] = [];
+    render({ target: "window", onUpdate: (p) => { calls.push(p); } });
+    const firstBar = document.body.querySelector('[aria-hidden="true"]');
+    expect(calls).toEqual([0]);
+
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 300 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames();
+    });
+    expect(progress()).toBe("0.5");
+    expect(calls).toEqual([0, 0.5]);
+
+    const newCalls: number[] = [];
+    render({ target: "window", onUpdate: (p) => { newCalls.push(p); } });
+    const currentBar = document.body.querySelector('[aria-hidden="true"]');
+
+    expect(currentBar).toBe(firstBar);
+    expect(progress()).toBe("0.5");
+    expect(newCalls).toEqual([]);
+
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 450 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames(20);
+    });
+    expect(newCalls).toEqual([0.75]);
+    expect(progress()).toBe("0.75");
+  });
+
+  it("supports reactive: false for zero-render scroll tracking and imperative getProgress()", () => {
+    let hookGetProgress = () => -1;
+    let renderCount = 0;
+    function ZeroRenderExample() {
+      renderCount++;
+      const { ref, progress, getProgress } = useScrollProgress<HTMLDivElement>({
+        target: "window",
+        reactive: false,
+      });
+      hookGetProgress = getProgress;
+      return createElement("div", { ref, "data-progress": String(progress) });
+    }
+
+    act(() => root.render(createElement(ZeroRenderExample)));
+    mounted = true;
+    expect(renderCount).toBe(1);
+    expect(progress()).toBe("0");
+    expect(hookGetProgress()).toBe(0);
+
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 300 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames();
+    });
+
+    // Zero additional React renders (renderCount remains 1), while getProgress() provides 0.5
+    expect(renderCount).toBe(1);
+    expect(progress()).toBe("0");
+    expect(hookGetProgress()).toBe(0.5);
+  });
+
+  it("supports target as a React RefObject", () => {
+    const container = document.createElement("div");
+    Object.defineProperty(container, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(container, "clientHeight", { configurable: true, value: 200 });
+    const containerRef = { current: container };
+
+    render({ target: containerRef });
+    container.scrollTop = 400;
+
+    act(() => container.dispatchEvent(new Event("scroll")));
+    expect(frames.size).toBe(1);
+    act(() => flushFrames());
+
+    expect(progress()).toBe("0.5");
+  });
 });

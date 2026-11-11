@@ -252,6 +252,24 @@ describe("textHighlight()", () => {
     expect(element.childNodes).toEqual([child]);
   });
 
+  it("supports configurable CSS or function easing", () => {
+    const element = makeElement();
+    const controls = textHighlight(asHTMLElement(element), { easing: "ease-in-out" });
+    expect(wrapperOf(element).style.getPropertyValue("transition")).toContain("ease-in-out");
+    controls.destroy();
+
+    expect(() => textHighlight(asHTMLElement(element), { easing: "" })).toThrow(TypeError);
+    expect(() => textHighlight(asHTMLElement(element), { easing: 123 as never })).toThrow(TypeError);
+  });
+
+  it("applies final highlight state immediately when duration is 0", () => {
+    const element = makeElement();
+    const controls = textHighlight(asHTMLElement(element), { duration: 0 });
+    expect(wrapperOf(element).style.getPropertyValue("background-size")).toBe("100% 0.75em");
+    expect(frames.size).toBe(0);
+    controls.destroy();
+  });
+
   it("returns inert controls for empty selector matches and exposes public types", () => {
     const controls = textHighlight(".missing");
     expect(() => controls.destroy()).not.toThrow();

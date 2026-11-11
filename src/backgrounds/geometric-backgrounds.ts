@@ -151,6 +151,11 @@ function setStroke(
   context.globalAlpha = intensity;
 }
 
+const HEX_OFFSETS = Array.from({ length: 6 }, (_, side) => ({
+  cos: Math.cos((Math.PI / 3) * side),
+  sin: Math.sin((Math.PI / 3) * side),
+}));
+
 function drawHexagon(
   context: CanvasRenderingContext2D,
   x: number,
@@ -159,9 +164,9 @@ function drawHexagon(
 ): void {
   context.beginPath();
   for (let side = 0; side < 6; side++) {
-    const angle = (Math.PI / 3) * side;
-    const px = x + Math.cos(angle) * radius;
-    const py = y + Math.sin(angle) * radius;
+    const offset = HEX_OFFSETS[side];
+    const px = x + offset.cos * radius;
+    const py = y + offset.sin * radius;
     if (side === 0) context.moveTo(px, py);
     else context.lineTo(px, py);
   }
@@ -640,6 +645,7 @@ export function geometricBackground(
     scheduler.destroy();
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     throw error;
   }
   const onWindowResize = (): void => {
@@ -657,9 +663,8 @@ export function geometricBackground(
   const inserted: GeometryState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       intersectionObserver?.observe(state.element);
       resizeObserver?.observe(state.element);
@@ -670,10 +675,11 @@ export function geometricBackground(
     intersectionObserver?.disconnect();
     resizeObserver?.disconnect();
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
+    for (const state of states) releaseBackgroundCanvas(state.canvas);
     for (const state of inserted) {
-      if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+      releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -694,9 +700,8 @@ export function geometricBackground(
       resizeObserver?.disconnect();
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

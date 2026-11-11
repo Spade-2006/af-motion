@@ -1,3 +1,4 @@
+import type { EasingFunction } from "../core/animation.js";
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
@@ -14,6 +15,8 @@ export interface TextHighlightOptions {
   duration?: number;
   /** Start immediately or when the target enters the viewport. Defaults to "immediate". */
   trigger?: TextHighlightTrigger;
+  /** CSS timing function or progress easing function. Defaults to "ease-out". */
+  easing?: string | EasingFunction;
 }
 
 export interface TextHighlightControls {
@@ -45,6 +48,34 @@ function validateColor(color: string): void {
   if (typeof CSS !== "undefined" && typeof CSS.supports === "function" && !CSS.supports("color", color)) {
     throw new TypeError(`Invalid CSS color "${color}"`);
   }
+}
+
+function cssEasing(easing: string | EasingFunction): string {
+  if (typeof easing === "string") {
+    const value = easing.trim();
+    if (value === "") throw new TypeError("easing must be a non-empty CSS timing function or function");
+    if (
+      typeof CSS !== "undefined" &&
+      typeof CSS.supports === "function" &&
+      !CSS.supports("transition-timing-function", value)
+    ) {
+      throw new TypeError(`Invalid CSS timing function "${value}"`);
+    }
+    return value;
+  }
+  if (typeof easing !== "function") {
+    throw new TypeError("easing must be a CSS timing function or function");
+  }
+
+  const samples = Array.from({ length: 21 }, (_, index) => {
+    const progress = index / 20;
+    const value = easing(progress);
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new TypeError(`easing must return finite numbers, received ${String(value)} at ${progress}`);
+    }
+    return `${value} ${progress * 100}%`;
+  });
+  return `linear(${samples.join(", ")})`;
 }
 
 function applyInitialHighlight(wrapper: HTMLSpanElement, style: TextHighlightStyle, color: string): void {
@@ -79,6 +110,7 @@ export function textHighlight(
     color = DEFAULT_COLOR,
     duration = DEFAULT_DURATION_MS,
     trigger = DEFAULT_TRIGGER,
+    easing = "ease-out",
   } = options;
 
   if (style !== "marker" && style !== "underline" && style !== "box") {
@@ -91,6 +123,7 @@ export function textHighlight(
   if (trigger !== "scroll" && trigger !== "immediate") {
     throw new TypeError(`trigger must be "scroll" or "immediate", received ${String(trigger)}`);
   }
+  const timingFunction = cssEasing(easing);
 
   const elements = resolveTargets(target);
   if (elements.length === 0) return { destroy: () => undefined };
@@ -110,7 +143,7 @@ export function textHighlight(
     const wrapper = document.createElement("span");
     wrapper.setAttribute("data-af-motion-highlight", "");
     applyInitialHighlight(wrapper, style, color);
-    wrapper.style.setProperty("transition", `background-size ${duration}ms ease-out`);
+    wrapper.style.setProperty("transition", `background-size ${duration}ms ${timingFunction}`);
     return {
       element,
       wrapper,
@@ -136,7 +169,7 @@ export function textHighlight(
   const finish = (state: HighlightState): void => {
     if (destroyed || state.started) return;
     state.started = true;
-    if (reducedMotion) {
+    if (reducedMotion || duration === 0) {
       state.wrapper.style.setProperty("background-size", finalBackgroundSize(style));
       return;
     }

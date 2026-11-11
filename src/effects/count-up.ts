@@ -20,6 +20,8 @@ export interface CountUpOptions {
   suffix?: string;
   /** Name of an easing in the public registry, or a custom easing function. Defaults to linear. */
   easing?: EasingName | EasingFunction;
+  /** Fires once after the count animation finishes. */
+  onComplete?: () => void;
 }
 
 export interface CountUpControls {
@@ -69,6 +71,9 @@ export function countUp(target: AnimateTarget, options: CountUpOptions = {}): Co
   }
   if (typeof prefix !== "string") throw new TypeError("prefix must be a string");
   if (typeof suffix !== "string") throw new TypeError("suffix must be a string");
+  if (options.onComplete !== undefined && typeof options.onComplete !== "function") {
+    throw new TypeError("onComplete must be a function");
+  }
 
   let easingFunction: EasingFunction;
   if (typeof easing === "string") {
@@ -113,6 +118,7 @@ export function countUp(target: AnimateTarget, options: CountUpOptions = {}): Co
 
   if (prefersReducedMotion() || duration === 0) {
     write(to);
+    options.onComplete?.();
     return {
       destroy: () => {
         if (destroyed) return;
@@ -144,7 +150,10 @@ export function countUp(target: AnimateTarget, options: CountUpOptions = {}): Co
     write(progress === 1 ? to : from + (to - from) * eased);
 
     if (progress < 1) frameId = requestAnimationFrame(tick);
-    else stopPreferenceListener();
+    else {
+      stopPreferenceListener();
+      options.onComplete?.();
+    }
   };
 
   stopPreferenceListener = onReducedMotionChange((reduced) => {
@@ -152,6 +161,7 @@ export function countUp(target: AnimateTarget, options: CountUpOptions = {}): Co
     stop();
     write(to);
     stopPreferenceListener();
+    options.onComplete?.();
   });
   frameId = requestAnimationFrame(tick);
 

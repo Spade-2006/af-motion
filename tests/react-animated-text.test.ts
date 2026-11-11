@@ -165,4 +165,40 @@ describe("AnimatedText", () => {
     expect(animate).not.toHaveBeenCalled();
     expect(visualText().style.backgroundSize).toBe("100% 100%");
   });
+
+  it("does not restart animation when re-rendered with equivalent effectOptions object", () => {
+    vi.useFakeTimers();
+    render({
+      effect: "typewriter",
+      text: "Hello",
+      effectOptions: { typeSpeed: 10, cursor: "" },
+    });
+    const element = visualText();
+
+    act(() => vi.advanceTimersByTime(20));
+    expect(element.textContent).toBe("He");
+
+    render({
+      effect: "typewriter",
+      text: "Hello",
+      effectOptions: { typeSpeed: 10, cursor: "" },
+    });
+
+    expect(element.textContent).toBe("He");
+    act(() => vi.advanceTimersByTime(10));
+    expect(element.textContent).toBe("Hel");
+  });
+
+  it("forwards external ref to the root span element", () => {
+    let capturedSpan: HTMLSpanElement | null = null;
+    act(() => root.render(createElement(AnimatedText, {
+      ref: (node: HTMLSpanElement | null) => { capturedSpan = node; },
+      effect: "typewriter",
+      text: "Ref Test",
+    })));
+    mounted = true;
+
+    expect(capturedSpan).toBe(host.firstElementChild);
+    expect(capturedSpan?.tagName).toBe("SPAN");
+  });
 });

@@ -174,7 +174,7 @@ export function textReveal(target: AnimateTarget, options: TextRevealOptions = {
   const revealTarget = (state: RevealTarget): void => {
     if (destroyed || state.started) return;
     state.started = true;
-    if (reducedMotion) {
+    if (reducedMotion || duration === 0) {
       for (const unit of state.units) {
         unit.style.setProperty("opacity", "1");
         unit.style.setProperty("transform", "none");

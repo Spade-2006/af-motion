@@ -1,6 +1,7 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
+import { acquireEffectTarget, releaseEffectTarget } from "../core/transform.js";
 
 export interface BorderBeamOptions {
   /** Beam color. Defaults to violet. */
@@ -26,19 +27,6 @@ export interface BorderBeamControls {
   destroy(): void;
 }
 
-interface InlineStyleValue {
-  value: string;
-  priority: string;
-}
-
-interface TargetRecord {
-  count: number;
-  position: InlineStyleValue;
-  isolation: InlineStyleValue;
-  restorePosition: boolean;
-  restoreIsolation: boolean;
-}
-
 interface BeamState {
   element: HTMLElement;
   layer: HTMLDivElement;
@@ -50,47 +38,8 @@ const DEFAULT_SIZE = 120;
 const DEFAULT_DURATION = 3000;
 const DEFAULT_BORDER_WIDTH = 1;
 const DEFAULT_RADIUS = 16;
-const targetRecords = new WeakMap<HTMLElement, TargetRecord>();
-
-function readInlineStyle(element: HTMLElement, property: string): InlineStyleValue {
-  return {
-    value: element.style.getPropertyValue(property),
-    priority: element.style.getPropertyPriority(property),
-  };
-}
-
-function restoreInlineStyle(element: HTMLElement, property: string, original: InlineStyleValue): void {
-  if (original.value === "") element.style.removeProperty(property);
-  else element.style.setProperty(property, original.value, original.priority);
-}
-
-function acquireTarget(element: HTMLElement): void {
-  const current = targetRecords.get(element);
-  if (current) {
-    current.count++;
-    return;
-  }
-
-  const position = readInlineStyle(element, "position");
-  const isolation = readInlineStyle(element, "isolation");
-  const computed = typeof getComputedStyle === "function" ? getComputedStyle(element) : undefined;
-  const restorePosition = (computed?.position ?? (position.value || "static")) === "static";
-  const restoreIsolation = (computed?.isolation ?? isolation.value) !== "isolate";
-  if (restorePosition) element.style.setProperty("position", "relative");
-  if (restoreIsolation) element.style.setProperty("isolation", "isolate");
-  targetRecords.set(element, { count: 1, position, isolation, restorePosition, restoreIsolation });
-}
-
-function releaseTarget(element: HTMLElement): void {
-  const record = targetRecords.get(element);
-  if (!record) return;
-  record.count--;
-  if (record.count > 0) return;
-
-  targetRecords.delete(element);
-  if (record.restorePosition) restoreInlineStyle(element, "position", record.position);
-  if (record.restoreIsolation) restoreInlineStyle(element, "isolation", record.isolation);
-}
+const acquireTarget = acquireEffectTarget;
+const releaseTarget = releaseEffectTarget;
 
 function assertFinite(name: string, value: number, minimum: number, maximum = Number.POSITIVE_INFINITY): void {
   if (typeof value !== "number" || !Number.isFinite(value) || value < minimum || value > maximum) {

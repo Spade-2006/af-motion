@@ -167,7 +167,7 @@ export function textMask(target: AnimateTarget, options: TextMaskOptions = {}): 
   const finish = (state: MaskState): void => {
     if (destroyed || state.started) return;
     state.started = true;
-    if (reducedMotion) {
+    if (reducedMotion || duration === 0) {
       state.wrapper.style.setProperty("clip-path", "inset(0)");
       return;
     }

@@ -1,0 +1,10 @@
+node_modules/
+website-dist/
+docs-dist/
+studio-dist/
+*.tgz
+.env
+.env.*
+.DS_Store
+Thumbs.db
+dist/

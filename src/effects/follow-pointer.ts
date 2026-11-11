@@ -54,13 +54,14 @@ export function followPointer(target: AnimateTarget, options: FollowPointerOptio
   }
   if (typeof easing !== "function") throw new TypeError("easing must be a function");
 
-  const elements = resolveTargets(target);
-  if (elements.length === 0) return { destroy: () => undefined };
   const containers = resolveTargets(containerTarget);
   if (containers.length !== 1) {
     throw new RangeError(`container must resolve to exactly one HTMLElement, received ${containers.length}`);
   }
   const container = containers[0] as HTMLElement;
+
+  const elements = resolveTargets(target);
+  if (elements.length === 0) return { destroy: () => undefined };
 
   const reducedInitially = prefersReducedMotion();
   const states = new Map<HTMLElement, FollowState>();

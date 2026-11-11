@@ -37,7 +37,10 @@ export interface StaggerOptions {
   respectReducedMotion?: boolean;
 }
 
-export type StaggerControls = AnimationControls;
+export interface StaggerControls extends AnimationControls {
+  /** Cancels all child element animations and releases resources. Safe to call repeatedly. */
+  destroy(): void;
+}
 
 const DEFAULT_PROPERTIES: AnimatableProperties = {
   opacity: [0, 1],
@@ -92,7 +95,11 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
   const elements = resolveTargets(target);
   if (elements.length === 0) {
     // Validates properties, duration and delay; nothing matches, so nothing runs.
-    return animate(target, properties, baseOptions);
+    const emptyControls = animate(target, properties, baseOptions);
+    return {
+      ...emptyControls,
+      destroy: () => emptyControls.cancel(),
+    };
   }
 
   if (!Number.isFinite(delay + (elements.length - 1) * interval)) {
@@ -151,6 +158,7 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
     throw error;
   }
 
+  let cancelled = false;
   return {
     seek: (progress) => {
       for (const child of children) child.seek(progress);
@@ -169,6 +177,13 @@ export function stagger(target: AnimateTarget, options: StaggerOptions = {}): St
     },
     getPlaybackRate: () => children[0]?.getPlaybackRate() ?? playbackRate ?? 1,
     cancel: () => {
+      if (cancelled) return;
+      cancelled = true;
+      for (const child of children) child.cancel();
+    },
+    destroy: () => {
+      if (cancelled) return;
+      cancelled = true;
       for (const child of children) child.cancel();
     },
   };

@@ -1,10 +1,11 @@
 import { resolveTargets } from "../core/animate.js";
 import type { AnimateTarget } from "../core/animate.js";
 import { onReducedMotionChange, prefersReducedMotion } from "../core/motion.js";
-import { getActivePalette, getPalette, subscribeToPaletteChanges } from "../core/palettes.js";
 import {
   acquireBackgroundTarget as acquireTarget,
   releaseBackgroundTarget as releaseTarget,
+  resolveBackgroundColors,
+  subscribeToActiveBackgroundPalette,
 } from "./internal/canvas-lifecycle.js";
 
 export type AdvancedGradientType = "mesh" | "aurora" | "radial" | "conic";
@@ -82,13 +83,6 @@ function validateStyle(style: Readonly<Record<string, string>> | undefined): voi
   }
 }
 
-function paletteColors(name: string | "active" | undefined): readonly string[] | undefined {
-  if (name === undefined) return undefined;
-  const palette = name === "active" ? getActivePalette() : getPalette(name);
-  if (!palette && name !== "active") throw new TypeError(`Unknown palette "${name}"`);
-  return palette ? [palette.tokens.primary, palette.tokens.secondary, palette.tokens.accent] : undefined;
-}
-
 function createStylesheet(name: string, intensity: number, direction: number): HTMLStyleElement {
   const radians = (direction * Math.PI) / 180;
   const x = Math.cos(radians) * intensity * 8;
@@ -157,10 +151,9 @@ export function advancedGradientBackground(
     throw new TypeError("className must be a string");
   }
   validateStyle(style);
-  const selectedPaletteColors = paletteColors(palette);
-  const initialColors = selectedPaletteColors ?? configuredColors;
+  validateColors(configuredColors);
+  const initialColors = resolveBackgroundColors(palette, configuredColors);
   validateColors(initialColors);
-  if (palette === "active") validateColors(configuredColors);
   const elements = resolveTargets(target);
   if (elements.length === 0) return { destroy: () => undefined };
   if (typeof document === "undefined" || typeof document.createElement !== "function") {
@@ -180,6 +173,7 @@ export function advancedGradientBackground(
     layer.style.setProperty("background-size", size);
   };
   const updateMotion = (reduced: boolean): void => {
+    if (destroyed) return;
     for (const layer of layers) {
       if (reduced || speed === 0 || (type !== "mesh" && type !== "aurora")) {
         layer.style.removeProperty("animation");
@@ -208,30 +202,29 @@ export function advancedGradientBackground(
       for (const [property, value] of Object.entries(style ?? {})) {
         layer.style.setProperty(property, value);
       }
-      acquireTarget(element);
+      acquireTarget(element, layer);
       acquired.push(element);
-      element.insertBefore(layer, element.firstChild);
       layers.push(layer);
     }
     updateMotion(reducedMotion);
   } catch (error) {
-    for (const layer of layers) layer.parentElement?.removeChild(layer);
-    for (const element of acquired) releaseTarget(element);
+    for (let index = 0; index < layers.length; index++) {
+      const layer = layers[index];
+      const element = acquired[index];
+      if (element && layer) releaseTarget(element, layer);
+      else if (element) releaseTarget(element);
+      else if (layer?.parentElement) layer.parentElement.removeChild(layer);
+    }
     stylesheet.parentElement?.removeChild(stylesheet);
     throw error;
   }
 
   const stopMotionListener = onReducedMotionChange(updateMotion);
-  const stopPaletteListener = palette === "active"
-    ? subscribeToPaletteChanges((activePalette) => {
-        if (destroyed) return;
-        const colors = activePalette
-          ? [activePalette.tokens.primary, activePalette.tokens.secondary, activePalette.tokens.accent]
-          : configuredColors;
-        validateColors(colors);
-        for (const layer of layers) render(layer, colors);
-      })
-    : () => undefined;
+  const stopPaletteListener = subscribeToActiveBackgroundPalette(palette, configuredColors, (colors) => {
+    if (destroyed) return;
+    validateColors(colors);
+    for (const layer of layers) render(layer, colors);
+  });
 
   return {
     destroy: () => {
@@ -243,8 +236,7 @@ export function advancedGradientBackground(
         const layer = layers[index];
         const element = elements[index];
         if (!layer || !element) continue;
-        if (layer.parentElement === element) element.removeChild(layer);
-        releaseTarget(element);
+        releaseTarget(element, layer);
       }
       stylesheet.parentElement?.removeChild(stylesheet);
     },

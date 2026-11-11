@@ -1,265 +1,201 @@
-# af-motion
-A modern JavaScript animation and frontend effects toolkit
+# AF Motion (Auto Flow Motion)
 
-## Easing
+**Auto Flow Motion (AF Motion)** is a framework-independent JavaScript and TypeScript animation engine paired with optional React 19 bindings, spring and inertia physics, multi-track timelines, visual effects, 19 design styles, 33 curated palettes, 5 Motion DNA profiles, 3D/GPU tooling, deterministic AI Motion Intelligence, a developer CLI, and an offline Model Context Protocol (MCP) server.
 
-Pass either an easing function or a built-in/registered easing name to `animate`
-or `animateProgress`:
+---
 
-```ts
-registerEasing("smoothStep", (progress) => progress * progress * (3 - 2 * progress));
+## Core Capabilities
 
-animate(element, { opacity: [0, 1] }, {
-  duration: 500,
-  easing: "smoothStep",
-});
+- **Framework-Independent Core (`af-motion`)**: Web Animations API and shared `requestAnimationFrame` progress engine (`animate`, `animateProgress`), damped springs (`animateSpring`), inertia physics (`animateInertia`), custom easing registry (`easings`, `registerEasing`), multi-track timelines (`createTimeline`), layered transforms (`magnetic`, `tilt`, `parallax`), scroll triggers/observers (`reveal`, `stagger`, `inView`, `scrollProgress`, `scrollVelocity`, `scrollTrigger`), canvas backgrounds (`aurora`, `particleField`), and 33 semantic palettes.
+- **Optional React Bindings (`af-motion/react`)**: Client hooks and components (`useAnimate`, `useInView`, `useMicrointeraction`, `useMotionAccessibility`, `Reveal`, `Interactive`, `AnimatedText`, `GlassSurface`) with zero React dependency leaked into core modules.
+- **Presets & Choreography (`af-motion/presets`)**: `39` built-in motion presets (`listPresets`, `getPreset`, `applyPreset`, `animatePreset`, `registerAnimationPreset`) and synchronized cross-system choreography helpers.
+- **Catalogue, Styles, 3D & Intelligence (`af-motion/catalogue`)**: `19` visual design styles, `5` Motion DNA personalities (`precise`, `playful`, `elegant`, `energetic`, `editorial-flow`), `validateMotionConfig()`, `optimizeMotion()`, offline deterministic Design-to-Motion and Scene Generation, safe agent workflow planning, 3D scene/GPU utilities, and `createAFMotionMCPServer`.
+- **Developer CLI & MCP (`af-motion`, `af-motion-mcp`)**: Terminal commands (`init`, `doctor`, `validate`, `presets`, `info`, `example`) and stdio JSON-RPC 2.0 MCP server.
+
+---
+
+## Installation
+
+```bash
+npm install af-motion
 ```
 
-Use `getEasing(name)` to retrieve a built-in or registered easing. It returns
-`undefined` for unknown names; animations using an unknown name throw a `TypeError`.
-`removeEasing(name)` removes a custom easing and returns whether one was removed.
-Built-in easing names cannot be replaced or removed. Custom registrations with the
-same name replace the previous custom function.
+`react` is an optional peer dependency (`^18.0.0 || ^19.0.0`). Vanilla JS/TS, Preset, Catalogue, CLI, and MCP workflows run without React installed.
 
-## React
+---
 
-The optional `af-motion/react` entry point provides `useAnimate()`. Attach its
-`ref` to an element and call the returned `animate` function with the same
-properties and options as `animate()`. It returns `AnimationControls`, or `null`
-when the ref does not currently point to an element. Active animations are
-cancelled automatically when the component unmounts.
+## Quick Start
+
+### Basic DOM Animation
+
+```ts
+import { animate } from "af-motion";
+
+const controls = animate(
+  ".card",
+  { opacity: [0, 1], transform: ["translateY(16px)", "translateY(0px)"] },
+  { duration: 360, easing: "easeOutCubic" }
+);
+
+// Supports pause(), resume(), reverse(), seek(), and cancel()
+controls.cancel();
+```
+
+### React Integration (`af-motion/react`)
 
 ```tsx
-import { useAnimate } from "af-motion/react";
+"use client";
 
-function FadeIn() {
+import { Interactive, Reveal, useAnimate } from "af-motion/react";
+
+export function MotionCard() {
   const { ref, animate } = useAnimate<HTMLDivElement>();
 
   return (
-    <div
-      ref={ref}
-      onClick={() => animate({ opacity: [0, 1] }, { duration: 300 })}
-    />
+    <Reveal>
+      <Interactive>
+        <div
+          ref={ref}
+          onClick={() => animate({ opacity: [0.7, 1] }, { duration: 240 })}
+        >
+          Auto Flow Motion Card
+        </div>
+      </Interactive>
+    </Reveal>
   );
 }
 ```
 
-## Animation presets
-
-`animatePreset(target, name, overrides)` runs a built-in or registered preset
-through the existing `animate()` engine. Built-ins include `fadeIn`, `fadeOut`,
-`slideUp`, `slideDown`, `scaleIn`, and `scaleOut`.
+### Easing, Spring Physics & Timelines
 
 ```ts
-animatePreset(".card", "slideUp", { duration: 700 });
+import { animateSpring, createTimeline, registerEasing } from "af-motion";
 
-registerAnimationPreset("popIn", {
-  properties: { opacity: [0, 1], transform: ["scale(0.8)", "scale(1)"] },
-  options: { duration: 350, easing: "easeOutBack" },
-});
-```
+registerEasing("smoothStep", (t) => t * t * (3 - 2 * t));
 
-Use `getAnimationPreset(name)` to retrieve a frozen snapshot and
-`removeAnimationPreset(name)` to remove a custom preset. Built-in names cannot
-be replaced or removed. Preset timing and callback options can be overridden
-per call; stored definitions and caller-owned objects are not mutated.
-
-## Animation timelines
-
-Use `createTimeline()` to add animations at millisecond offsets and then call
-`play()`. Offsets can be sequential or overlap, and each step's `options.delay`
-is handled by the underlying animation engine. Add labels for reusable positions,
-or position a step relative to the preceding step's start or configured end.
-
-```ts
-const timeline = createTimeline()
-  .addLabel("enter", 0)
-  .add({ target: ".card", properties: { opacity: [0, 1] }, at: "enter" })
-  .add({
-    target: ".card",
-    properties: { transform: ["translateY(16px)", "translateY(0px)"] },
-    at: { previous: "end", offset: -100 },
-    options: { duration: 500, delay: 50 },
-  });
-
-timeline.play();
-await timeline.finished;
-```
-
-The timeline can be paused, resumed, or cancelled; cancellation rejects
-`finished` with an `AbortError`.
-
-## Spring animation
-
-`animateSpring()` animates a scalar position toward a target using configurable
-stiffness, damping, mass, and initial velocity. It reports position and velocity
-on each shared animation frame and calls `onComplete` after settling:
-
-```ts
 const spring = animateSpring({
   from: 0,
   to: 1,
-  config: { stiffness: 180, damping: 20, mass: 1, initialVelocity: 0 },
-  onUpdate: ({ position, velocity }) => console.log(position, velocity),
+  config: { stiffness: 180, damping: 20, mass: 1 },
+  onUpdate: ({ position }) => console.log(position),
   onComplete: () => console.log("settled"),
 });
-
 spring.cancel();
+
+const timeline = createTimeline()
+  .addLabel("enter", 0)
+  .add({ target: ".hero", properties: { opacity: [0, 1] }, at: "enter" })
+  .add({
+    target: ".subtitle",
+    properties: { transform: ["translateY(12px)", "translateY(0px)"] },
+    at: { previous: "end", offset: -80 },
+    options: { duration: 400 },
+  });
+
+timeline.play();
 ```
 
-Spring motion respects reduced-motion preferences by completing at the target.
-Call `cancel()` to stop updates and release scheduled work.
-
-## Inertia motion
-
-`animateInertia()` starts a scalar position with an initial velocity and applies
-exponential friction until the speed falls below `minVelocity`:
+### Visual Effects & Cleanup
 
 ```ts
-const inertia = animateInertia({
-  from: 0,
-  initialVelocity: 900,
-  friction: 8,
-  minVelocity: 10,
-  min: 0,
-  max: 300,
-  onUpdate: ({ position, velocity }) => console.log(position, velocity),
-  onComplete: () => console.log("settled"),
+import { inView, magneticElement, parallax, tilt } from "af-motion";
+
+const mag = magneticElement(".cta-button", { strength: 0.25, distance: 120 });
+const tlt = tilt(".preview-card");
+const par = parallax(".layer", { speed: 0.2 });
+const view = inView(".reveal-section", (el) => {
+  el.classList.add("is-visible");
+  return () => el.classList.remove("is-visible");
 });
 
-inertia.cancel();
-```
-
-It uses the shared animation-frame scheduler and respects reduced-motion
-preferences by completing at the current position without moving. When a
-configured bound is reached, position is clamped to that bound and velocity
-stops immediately; inertia does not bounce. `cancel()` suppresses later updates
-and completion callbacks.
-
-Timelines can also be nested once into a parent at a number, label, or relative
-position. Child labels and offsets remain local to the child timeline, while
-parent playback controls propagate to nested work:
-
-```ts
-const child = createTimeline()
-  .addLabel("details", 100)
-  .add({ target: ".details", properties: { opacity: [0, 1] }, at: "details" });
-
-const parent = createTimeline().addTimeline(child, 250);
-parent.play();
-await parent.finished;
-```
-
-## Transform composition
-
-`magnetic()`, `tilt()`, and `parallax()` compose their transforms through shared
-layers, so these effects can run together on the same element and be destroyed
-independently while preserving the element's original transform.
-
-Direct `transform` animation through `animate()`, and the transform-based
-`reveal()`/`stagger()` defaults, still write the CSS `transform` property directly.
-Avoid combining those on the same element with layered effects: direct writes can
-temporarily replace composed layers. The library does not parse arbitrary CSS
-transform strings to merge them.
-
-## Reduced motion
-
-`animate()` and `animateProgress()` respect `prefers-reduced-motion` by default.
-Animations complete at their current direction's endpoint when reduced motion is
-active, including when the preference changes during playback. Set
-`respectReducedMotion: false` to opt out. Effects and backgrounds use the shared
-motion preference helper and remove their preference listeners when destroyed.
-
-## Scroll triggers
-
-`scrollProgress()` displays the existing fixed progress bar and also exposes the
-current normalized progress. Pass `onUpdate` to observe changes; omit the
-`target` to track the page or provide an element/selector for a scroll container:
-
-```ts
-const progress = scrollProgress({
-  target: ".scroll-container",
-  onUpdate: (value) => console.log(value),
-});
-
-console.log(progress.getProgress());
-progress.destroy();
-```
-
-Progress is clamped to `0..1`; containers without scrollable distance report `0`.
-Updates are batched during normal motion and made immediate when reduced motion is
-preferred. Repeated values do not trigger duplicate callbacks.
-
-`scrollVelocity()` reports velocity in pixels per second together with direction,
-current position, and normalized progress:
-
-```ts
-const velocity = scrollVelocity({
-  target: ".scroll-container",
-  onUpdate: ({ velocity, direction, position, progress }) => {
-    console.log({ velocity, direction, position, progress });
-  },
-});
-
-velocity.destroy();
-```
-
-Velocity becomes `0` when reduced motion is preferred, while direction and position
-continue to be measured.
-
-Use `scrollTrigger()` to run callbacks when one element or selector matches enters
-or leaves the configured intersection region. It uses `IntersectionObserver` and
-returns controls for cleanup:
-
-```ts
-const trigger = scrollTrigger(".section", {
-  rootMargin: "0px 0px -10% 0px",
-  threshold: 0.2,
-  once: true,
-  onEnter: (element) => console.log("entered", element),
-  onLeave: (element) => console.log("left", element),
-});
-
-trigger.destroy();
-```
-
-By default, each element is observed through its first enter/leave cycle. Set
-`once: false` to receive callbacks for subsequent transitions. If
-`IntersectionObserver` is unavailable, `scrollTrigger()` throws a descriptive
-error.
-
-For the common enter-and-cleanup pattern, use `inView()`:
-
-```ts
-const view = inView(".section", (element) => {
-  element.classList.add("active");
-  return () => element.classList.remove("active");
-}, { threshold: 0.2 });
-
+// Idempotent listener & observer cleanup
+mag.destroy();
+tlt.destroy();
+par.destroy();
 view.destroy();
 ```
 
-The returned cleanup runs when the element leaves or when `destroy()` is called.
-It accepts the same root margin, threshold, and one-time options as `scrollTrigger()`.
-
-## Interactive pointer effects
-
-`pointerGlow()` reuses the radial spotlight overlay, `magneticElement()` attracts
-elements within an optional radius, `hoverMotion()` animates composable transform
-layers, and `followPointer()` constrains an element to a container:
+### Presets, Motion DNA & Palettes
 
 ```ts
-const glow = pointerGlow(".card", { color: "#a78bfa", radius: 140 });
-const magnet = magneticElement(".button", { strength: 0.25, distance: 120 });
-const hover = hoverMotion(".card", { enter: { y: -6, scale: 1.03 } });
-const follower = followPointer(".cursor", { container: ".hero", smoothing: 0.12 });
+import { animatePreset, getMotionDNA, registerPalette } from "af-motion";
+import { applyPreset, listPresets } from "af-motion/presets";
 
-glow.destroy();
-magnet.destroy();
-hover.destroy();
-follower.destroy();
+const dna = getMotionDNA("precise");
+animatePreset(".panel", "slideUp", { duration: dna?.duration ?? 320 });
+
+const allPresets = listPresets();
+applyPreset(".hero-title", allPresets[0].name);
+
+registerPalette({
+  name: "Brand Obsidian",
+  primary: "#38BDF8",
+  secondary: "#0F172A",
+  accent: "#F472B6",
+});
 ```
 
-The `smoothing` option is measured in seconds (0–1). Pointer effects ignore touch,
-respect reduced-motion preferences, and expose `destroy()` to remove listeners and
-restore transform styles.
+### Catalogue, Validation, 3D/GPU & Offline AI Intelligence
+
+```ts
+import {
+  aiMotionRegistry,
+  createScene3D,
+  designToMotionEngine,
+  evaluateMotionQuality,
+  validateMotionConfig,
+} from "af-motion/catalogue";
+
+const searchResults = aiMotionRegistry.searchCapabilities({ term: "spring" });
+
+const report = validateMotionConfig({
+  duration: 320,
+  properties: { opacity: [0, 1], transform: ["translateY(8px)", "translateY(0px)"] },
+});
+
+const quality = evaluateMotionQuality({
+  configuration: { duration: 320, properties: { opacity: [0, 1] } },
+});
+
+const scene = createScene3D({ id: "preview-3d", autoStart: false });
+scene.destroy();
+```
+
+---
+
+## CLI & MCP Server
+
+```bash
+# Project tooling
+npx af-motion init --template vanilla-ts
+npx af-motion doctor
+npx af-motion validate af-motion.config.json
+npx af-motion presets
+npx af-motion example spring --print
+
+# Offline MCP server (stdio JSON-RPC 2.0)
+npx af-motion-mcp
+```
+
+---
+
+## Documentation, Release Notes & Source
+
+- **Source & Issues**: [github.com/Spade-2006/af-motion](https://github.com/Spade-2006/af-motion)
+- **Changelog**: [CHANGELOG.md](./CHANGELOG.md)
+- **Release Notes**: [RELEASE_NOTES.md](./RELEASE_NOTES.md)
+- **Interactive Docs App** (repository workspace): `npm run docs`
+- **Public Website App** (repository workspace): `npm run website`
+
+---
+
+## Compatibility Information
+
+- **Verified**: Node.js `v24.17.0` (`>=18.0.0` declared in `engines`), React `^19.3.1` (`StrictMode`, SSR `renderToString`, hydration), JSDOM `^26.1.0`, TypeScript `^7.0.2`.
+- **Declared / Unverified Locally**: React `^18.0.0`, Node.js `18` LTS, Bun, Deno, Next.js App Router runtime, and live Chromium/Firefox/Safari WebGL2 browser execution.
+
+---
+
+## License
+
+MIT © Satyansh Acharya

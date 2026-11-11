@@ -116,14 +116,18 @@ export function gradientBackground(
         layer.style.setProperty("animation", `${animationName} ${speed}s ease-in-out infinite`);
       }
 
-      acquireTarget(element);
+      acquireTarget(element, layer);
       acquired.push(element);
       layers.push(layer);
-      element.insertBefore(layer, element.firstChild);
     }
   } catch (error) {
-    for (const layer of layers) layer.parentElement?.removeChild(layer);
-    for (const element of acquired) releaseTarget(element);
+    for (let index = 0; index < layers.length; index++) {
+      const layer = layers[index];
+      const element = acquired[index];
+      if (element && layer) releaseTarget(element, layer);
+      else if (element) releaseTarget(element);
+      else if (layer?.parentElement) layer.parentElement.removeChild(layer);
+    }
     stylesheet.parentElement?.removeChild(stylesheet);
     throw error;
   }
@@ -150,8 +154,7 @@ export function gradientBackground(
         const layer = layers[index];
         const element = elements[index];
         if (!layer || !element) continue;
-        element.removeChild(layer);
-        releaseTarget(element);
+        releaseTarget(element, layer);
       }
       stylesheet.parentElement?.removeChild(stylesheet);
     },

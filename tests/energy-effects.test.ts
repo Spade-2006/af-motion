@@ -65,7 +65,8 @@ class FakeContext {
   ellipse = vi.fn();
   arc = vi.fn();
   fill = vi.fn();
-  stroke = vi.fn();
+  strokeAlphas: number[] = [];
+  stroke = vi.fn(() => { this.strokeAlphas.push(this.globalAlpha); });
   setTransform = vi.fn();
   createRadialGradient = vi.fn(() => new FakeGradient());
   createLinearGradient = vi.fn(() => new FakeGradient());
@@ -423,6 +424,21 @@ describe("energyBackground()", () => {
     expect(documentListeners.get("visibilitychange")?.size ?? 0).toBe(0);
     expect(motionListeners.size).toBe(0);
     expect(frames.size).toBe(0);
+    expect(element.children).toHaveLength(0);
+    expect(element.style.getPropertyValue("position")).toBe("");
+  });
+
+  it("controls visual strength through intensity and rejects invalid intensity values", () => {
+    const element = makeElement();
+    const target = asHTMLElement(element);
+    const controls = energyBackground(target, { effect: "laser-beams", intensity: 0.4, speed: 0 });
+    const canvas = canvasOf(element);
+    expect(canvas.context.strokeAlphas).toContain(0.4);
+    controls.destroy();
+
+    expect(() => energyBackground(target, { intensity: -0.1 })).toThrow(RangeError);
+    expect(() => energyBackground(target, { intensity: 1.1 })).toThrow(RangeError);
+    expect(() => energyBackground(target, { speed: -1 })).toThrow(RangeError);
     expect(element.children).toHaveLength(0);
     expect(element.style.getPropertyValue("position")).toBe("");
   });

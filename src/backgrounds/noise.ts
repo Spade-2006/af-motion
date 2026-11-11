@@ -30,6 +30,7 @@ interface CanvasState {
   context: CanvasRenderingContext2D;
   width: number;
   height: number;
+  imageData?: ImageData | null;
 }
 
 const DEFAULT_INTENSITY = 0.15;
@@ -57,13 +58,16 @@ function createCanvasState(element: HTMLElement): CanvasState {
   canvas.style.setProperty("display", "block");
   canvas.style.setProperty("z-index", "-1");
   canvas.style.setProperty("pointer-events", "none");
-  return { element, canvas, context, width: 0, height: 0 };
+  return { element, canvas, context, width: 0, height: 0, imageData: null };
 }
 
 function drawNoise(state: CanvasState, intensity: number, scale: number): void {
   const { context, canvas, width, height } = state;
   if (canvas.width === 0 || canvas.height === 0) return;
-  const image = context.createImageData(canvas.width, canvas.height);
+  if (!state.imageData || state.imageData.width !== canvas.width || state.imageData.height !== canvas.height) {
+    state.imageData = context.createImageData(canvas.width, canvas.height);
+  }
+  const image = state.imageData;
   const data = image.data;
   const dpr = width > 0 ? canvas.width / width : 1;
   const blockSize = Math.max(1, Math.round(scale * dpr));
@@ -221,9 +225,8 @@ export function noiseBackground(
   const inserted: CanvasState[] = [];
   try {
     for (const state of states) {
-      acquireTarget(state.element);
+      acquireTarget(state.element, state.canvas);
       acquired.push(state.element);
-      state.element.insertBefore(state.canvas, state.element.firstChild);
       inserted.push(state);
       resizeObserver?.observe(state.element);
     }
@@ -235,10 +238,9 @@ export function noiseBackground(
     if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
     if (hasVisibilityListener) document.removeEventListener("visibilitychange", onVisibilityChange);
     for (const state of inserted) {
-      state.element.removeChild(state.canvas);
       releaseBackgroundCanvas(state.canvas);
+      releaseTarget(state.element, state.canvas);
     }
-    for (const element of acquired) releaseTarget(element);
     throw error;
   }
 
@@ -255,9 +257,9 @@ export function noiseBackground(
       if (hasWindowResize) window.removeEventListener("resize", onWindowResize);
       if (hasVisibilityListener) document.removeEventListener("visibilitychange", onVisibilityChange);
       for (const state of states) {
-        if (state.canvas.parentElement === state.element) state.element.removeChild(state.canvas);
+        state.imageData = null;
         releaseBackgroundCanvas(state.canvas);
-        releaseTarget(state.element);
+        releaseTarget(state.element, state.canvas);
       }
     },
   };

@@ -135,4 +135,56 @@ describe("useInView", () => {
     expect(observer(0).disconnect).toHaveBeenCalledTimes(1);
     expect(observer(1).observed.size).toBe(1);
   });
+
+  it("does not recreate the observer when array threshold values remain equal", () => {
+    render({ threshold: [0, 0.5] });
+    const firstObserver = observer();
+    expect(FakeIntersectionObserver.instances).toHaveLength(1);
+
+    render({ threshold: [0, 0.5] });
+    expect(FakeIntersectionObserver.instances).toHaveLength(1);
+    expect(firstObserver.disconnect).not.toHaveBeenCalled();
+
+    render({ threshold: [0, 0.75] });
+    expect(FakeIntersectionObserver.instances).toHaveLength(2);
+    expect(firstObserver.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onEnter, onLeave, and onChange callbacks with optional cleanup", () => {
+    const cleanup = vi.fn();
+    const onEnter = vi.fn(() => cleanup);
+    const onLeave = vi.fn();
+    const onChange = vi.fn();
+
+    render({ once: false, onEnter, onLeave, onChange });
+    const element = host.firstElementChild as HTMLElement;
+
+    expect(isInView()).toBe("false");
+    act(() => observer().emit(element, true));
+
+    expect(isInView()).toBe("true");
+    expect(onEnter).toHaveBeenCalledWith(element, expect.any(Object));
+    expect(onChange).toHaveBeenCalledWith(true, element, expect.any(Object));
+
+    act(() => observer().emit(element, false));
+    expect(isInView()).toBe("false");
+    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(onLeave).toHaveBeenCalledWith(element, expect.any(Object));
+    expect(onChange).toHaveBeenCalledWith(false, element, expect.any(Object));
+  });
+
+  it("supports reactive: false for zero-render in-view tracking and external RefObject targets", () => {
+    const onEnter = vi.fn();
+    const externalElement = document.createElement("section");
+    const externalRef = { current: externalElement };
+
+    render({ target: externalRef, reactive: false, onEnter });
+
+    expect(isInView()).toBe("false");
+    expect(observer().observed.has(externalElement)).toBe(true);
+
+    act(() => observer().emit(externalElement, true));
+    expect(isInView()).toBe("false");
+    expect(onEnter).toHaveBeenCalledTimes(1);
+  });
 });

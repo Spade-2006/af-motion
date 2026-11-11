@@ -20,3 +20,8 @@
 
 ## Reporting
 - Final answer: confirmed issues fixed, changed files, actual test results. No restating of the diff.
+
+## Skills & Subpaths
+- All capabilities documented under `skills/` (master router: `skills/af-motion/SKILL.md`).
+- Subpaths: `af-motion` (core), `af-motion/react` (React hooks/components), `af-motion/catalogue` (intelligence/validation), `af-motion/presets` (recipes).
+- Respect reduced motion via `useMotionAccessibility()` and animate GPU properties (`transform`, `opacity`).

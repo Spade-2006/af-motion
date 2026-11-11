@@ -32,15 +32,33 @@ describe("npm package configuration", () => {
     expect(manifest.types).toBe("./dist/index.d.ts");
   });
 
-  it("maps only the supported ESM and React entry points to built files", () => {
+  it("maps all supported subpath exports to built files", () => {
     expect(manifest.exports).toEqual({
       ".": {
         types: "./dist/index.d.ts",
         import: "./dist/index.js",
+        default: "./dist/index.js",
       },
       "./react": {
         types: "./dist/react.d.ts",
         import: "./dist/react.js",
+        default: "./dist/react.js",
+      },
+      "./package.json": "./package.json",
+      "./catalogue": {
+        types: "./dist/catalogue.d.ts",
+        import: "./dist/catalogue.js",
+        default: "./dist/catalogue.js",
+      },
+      "./catalog": {
+        types: "./dist/catalogue.d.ts",
+        import: "./dist/catalogue.js",
+        default: "./dist/catalogue.js",
+      },
+      "./presets": {
+        types: "./dist/presets.d.ts",
+        import: "./dist/presets.js",
+        default: "./dist/presets.js",
       },
     });
   });

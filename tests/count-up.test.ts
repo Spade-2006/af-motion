@@ -169,6 +169,21 @@ describe("countUp()", () => {
     expect(element.textContent).toBe("Before");
   });
 
+  it("fires onComplete callback when finished or under reduced motion", () => {
+    const onComplete = vi.fn();
+    const element = new FakeHTMLElement("0");
+    countUp(asHTMLElement(element), { from: 0, to: 10, duration: 100, onComplete });
+    flushFrame(0);
+    flushFrame(100);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+
+    const reducedCb = vi.fn();
+    reducedMotion = true;
+    const reducedEl = new FakeHTMLElement("0");
+    countUp(asHTMLElement(reducedEl), { to: 10, onComplete: reducedCb });
+    expect(reducedCb).toHaveBeenCalledTimes(1);
+  });
+
   it("validates values and selectors before changing target text", () => {
     const element = new FakeHTMLElement("Untouched");
     expect(() => countUp(asHTMLElement(element), { from: Number.NaN })).toThrow(RangeError);
@@ -178,6 +193,7 @@ describe("countUp()", () => {
     expect(() => countUp(asHTMLElement(element), { decimals: 21 })).toThrow(RangeError);
     expect(() => countUp(asHTMLElement(element), { decimals: 1.5 })).toThrow(RangeError);
     expect(() => countUp(asHTMLElement(element), { prefix: 2 as unknown as string })).toThrow(TypeError);
+    expect(() => countUp(asHTMLElement(element), { onComplete: "bad" as never })).toThrow(TypeError);
     expect(() => countUp(asHTMLElement(element), { easing: "missing" as "linear" })).toThrow(TypeError);
     expect(() => countUp(asHTMLElement(element), { easing: (() => Number.NaN) as typeof easings.linear })).toThrow(TypeError);
     expect(() => countUp("!!bad")).toThrow(SyntaxError);

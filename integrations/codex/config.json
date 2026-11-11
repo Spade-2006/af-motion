@@ -1,0 +1,24 @@
+{
+  "$schema": "https://af-motion.dev/schemas/codex-config-v1.json",
+  "name": "af-motion-codex",
+  "version": "1.0.0",
+  "instructions": "integrations/codex/AGENTS.md",
+  "skills": {
+    "directory": "skills/",
+    "index": "skills/index.json",
+    "primarySkill": "skills/af-motion/SKILL.md"
+  },
+  "mcp": {
+    "command": "node",
+    "args": ["bin/mcp-server.js"],
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "prompts": {
+    "buttonMicrointeraction": "Create an accessible spring button microinteraction with hover and press feedback using AF Motion.",
+    "scrollRevealSection": "Implement a viewport-triggered scroll reveal section with staggered cards using AF Motion.",
+    "pageTransition": "Generate an entrance and exit page transition plan using AF Motion transitions.",
+    "validateMotion": "Validate and optimize this animation configuration for reduced-motion and GPU performance."
+  }
+}

@@ -187,4 +187,87 @@ describe("useScrollVelocity", () => {
     act(() => flushFrames(100));
     expect(value("position")).toBe("100");
   });
+
+  it("does not reset velocity data when onUpdate reference changes on re-render", () => {
+    let callCount = 0;
+    render({ target: "window", smoothing: 0, onUpdate: () => { callCount += 1; } });
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 200 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames(100);
+    });
+    expect(value("position")).toBe("200");
+    expect(value("velocity")).toBe("2000");
+
+    let newCallCount = 0;
+    render({ target: "window", smoothing: 0, onUpdate: () => { newCallCount += 1; } });
+
+    expect(value("position")).toBe("200");
+    expect(value("velocity")).toBe("2000");
+
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 300 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames(200);
+    });
+    expect(newCallCount).toBe(1);
+    expect(value("position")).toBe("300");
+  });
+
+  it("supports reactive: false for zero-render velocity tracking and imperative getData()", () => {
+    let hookGetData = () => ({ velocity: 0, direction: "idle" as const, position: 0, progress: 0 });
+    let renderCount = 0;
+    function ZeroRenderExample() {
+      renderCount++;
+      const { ref, data, getData } = useScrollVelocity<HTMLDivElement>({
+        target: "window",
+        smoothing: 0,
+        reactive: false,
+      });
+      hookGetData = getData;
+      return createElement("div", {
+        ref,
+        "data-velocity": String(data.velocity),
+        "data-direction": data.direction,
+      });
+    }
+
+    act(() => root.render(createElement(ZeroRenderExample)));
+    mounted = true;
+    expect(renderCount).toBe(1);
+    expect(value("velocity")).toBe("0");
+    expect(value("direction")).toBe("idle");
+    expect(hookGetData().direction).toBe("idle");
+
+    act(() => {
+      Object.defineProperty(window, "scrollY", { configurable: true, value: 200 });
+      window.dispatchEvent(new Event("scroll"));
+      flushFrames(100);
+    });
+
+    // Zero additional React renders (renderCount remains 1), while getData() provides the latest metrics
+    expect(renderCount).toBe(1);
+    expect(value("velocity")).toBe("0");
+    expect(hookGetData().velocity).toBe(2000);
+    expect(hookGetData().direction).toBe("down");
+  });
+
+  it("supports target as a React RefObject", () => {
+    const container = document.createElement("div");
+    Object.defineProperty(container, "scrollHeight", { configurable: true, value: 1000 });
+    Object.defineProperty(container, "clientHeight", { configurable: true, value: 200 });
+    const containerRef = { current: container };
+
+    render({ target: containerRef, smoothing: 0 });
+    container.scrollTop = 400;
+
+    act(() => {
+      container.dispatchEvent(new Event("scroll"));
+      flushFrames(100);
+    });
+
+    expect(value("direction")).toBe("down");
+    expect(value("position")).toBe("400");
+    expect(value("progress")).toBe("0.5");
+  });
 });

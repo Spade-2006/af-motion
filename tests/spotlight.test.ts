@@ -159,6 +159,16 @@ describe("spotlightBackground()", () => {
     expect(glow.style.getPropertyValue("--af-motion-spotlight-x")).toBe("50%");
     expect(glow.style.getPropertyValue("--af-motion-spotlight-y")).toBe("50%");
 
+    // Touch tap via pointerdown positions spotlight immediately
+    element.emit("pointerdown", 60, 50);
+    expect(glow.style.getPropertyValue("--af-motion-spotlight-x")).toBe("50px");
+    expect(glow.style.getPropertyValue("--af-motion-spotlight-y")).toBe("30px");
+
+    // pointercancel resets to centered neutral state
+    element.emit("pointercancel");
+    expect(glow.style.getPropertyValue("--af-motion-spotlight-x")).toBe("50%");
+    expect(glow.style.getPropertyValue("--af-motion-spotlight-y")).toBe("50%");
+
     controls.destroy();
     expect(element.children).toEqual([content]);
     expect(element.style.getPropertyValue("position")).toBe("");
